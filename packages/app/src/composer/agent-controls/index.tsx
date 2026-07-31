@@ -80,6 +80,7 @@ import { ComposerControlLayoutProvider } from "@/composer/agent-controls/layout-
 import { ComposerToolbarGlyph } from "@/composer/agent-controls/glyph";
 import { AgentControlTrigger } from "@/composer/agent-controls/control";
 import { CompactModelSheet } from "@/composer/agent-controls/model-sheet";
+import { usePiLiveHealth, type PiTailHealth } from "@/composer/pi-live-health";
 
 interface AgentControlOption {
   id: string;
@@ -116,6 +117,8 @@ interface ControlledAgentControlsProps {
   isCompactLayout?: boolean;
   isLiveAttach?: boolean;
   liveState?: "connected" | "disconnected" | "none";
+  tailState: PiTailHealth;
+  transportConnected: boolean;
 }
 
 export interface DraftAgentControlsProps {
@@ -207,7 +210,7 @@ function getFeatureIconColor(
   }
 }
 
-type ActiveSheet = "thinking" | "features" | null;
+type ActiveSheet = "thinking" | "features" | "live" | null;
 
 function resolveHasAnyControl({
   providerOptions,
@@ -431,6 +434,8 @@ function ControlledAgentControls({
   isRetryingModelProvider = false,
   isLiveAttach = false,
   liveState = "none",
+  tailState,
+  transportConnected,
   modeControl,
   modelSelectorServerId = null,
   isCompactLayout,
@@ -694,6 +699,8 @@ function ControlledAgentControls({
             displayProvider={displayProvider}
             isLiveAttach={isLiveAttach}
             liveState={liveState}
+            tailState={tailState}
+            transportConnected={transportConnected}
             displayThinking={displayThinking}
             openSelector={openSelector}
             providerAnchorRef={providerAnchorRef}
@@ -784,6 +791,8 @@ interface DesktopAgentControlsContentProps {
   displayProvider: string;
   isLiveAttach: boolean;
   liveState: "connected" | "disconnected" | "none";
+  tailState: PiTailHealth;
+  transportConnected: boolean;
   displayThinking: string;
   openSelector: AgentControlSelector | null;
   providerAnchorRef: RefObject<View | null>;
@@ -814,6 +823,56 @@ interface DesktopAgentControlsContentProps {
 }
 
 const DESKTOP_SEARCH_THRESHOLD = 6;
+const PI_LIVE_SHEET_HEADER: SheetHeader = { title: "Pi live diagnostics" };
+
+interface PiLiveStatusProps {
+  bridge: "connected" | "disconnected" | "none";
+  tail: PiTailHealth;
+  transportConnected: boolean;
+  visible: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+}
+
+function PiLiveStatus(props: PiLiveStatusProps) {
+  const { bridge, tail, transportConnected, visible, onOpen, onClose } = props;
+  const isLive = bridge === "connected" && tail === "connected" && transportConnected;
+  return (
+    <>
+      <Pressable
+        onPress={onOpen}
+        style={[
+          styles.liveBadge,
+          isLive ? styles.liveBadgeConnected : styles.liveBadgeDisconnected,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={`Pi live connection: ${isLive ? "live" : "disconnected"}. Open diagnostics.`}
+        testID="pi-live-status"
+      >
+        <Text style={styles.liveBadgeText}>{isLive ? "LIVE" : "DISCONNECTED"}</Text>
+      </Pressable>
+      <AdaptiveModalSheet
+        header={PI_LIVE_SHEET_HEADER}
+        visible={visible}
+        onClose={onClose}
+        testID="pi-live-diagnostics"
+      >
+        <View style={styles.liveDiagnostics}>
+          <Text style={styles.liveDiagnosticsLine}>
+            Browser transport: {transportConnected ? "CONNECTED" : "DISCONNECTED"}
+          </Text>
+          <Text style={styles.liveDiagnosticsLine}>
+            Bridge: {bridge === "connected" ? "CONNECTED" : "DISCONNECTED"}
+          </Text>
+          <Text style={styles.liveDiagnosticsLine}>Tail: {tail.toUpperCase()}</Text>
+          <Text style={styles.liveDiagnosticsHelp}>
+            LIVE requires browser transport, Pi bridge, and timeline tail all connected.
+          </Text>
+        </View>
+      </AdaptiveModalSheet>
+    </>
+  );
+}
 
 function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
   const { theme } = useUnistyles();
@@ -843,6 +902,8 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
     comboboxProviderOptions,
     comboboxThinkingOptions,
     liveState,
+    tailState,
+    transportConnected,
     displayProvider,
     displayThinking,
     openSelector,
@@ -876,6 +937,7 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
     [t],
   );
   const handleOpenFeatures = useCallback(() => handleOpenSheet("features"), [handleOpenSheet]);
+  const handleOpenLive = useCallback(() => handleOpenSheet("live"), [handleOpenSheet]);
   return (
     <>
       {providerOptions && providerOptions.length > 0 ? (
@@ -905,20 +967,15 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
         </>
       ) : null}
 
-      {/* TODO(pi-live-diagnostics): Make badge clickable; show socket state, session match, reconnect attempts, and doctor actions. */}
       {provider === "pi" ? (
-        <View
-          style={[
-            styles.liveBadge,
-            liveState === "connected" ? styles.liveBadgeConnected : styles.liveBadgeDisconnected,
-          ]}
-          accessible
-          accessibilityLabel={`Pi live connection: ${liveState}`}
-        >
-          <Text style={styles.liveBadgeText}>
-            {liveState === "connected" ? "LIVE" : "DISCONNECTED"}
-          </Text>
-        </View>
+        <PiLiveStatus
+          bridge={liveState}
+          tail={tailState}
+          transportConnected={transportConnected}
+          visible={activeSheet === "live"}
+          onOpen={handleOpenLive}
+          onClose={handleCloseSheet}
+        />
       ) : null}
 
       {canSelectModel ? (
@@ -1463,6 +1520,7 @@ export const AgentControls = memo(function AgentControls({
   const client = useSessionStore((state) => state.sessions[serverId]?.client ?? null);
   const toast = useToast();
   const modeControl = useLiveAgentModeControl(serverId, agentId);
+  const piLiveHealth = usePiLiveHealth(serverId, agentId);
 
   const {
     entries: snapshotEntries,
@@ -1675,6 +1733,10 @@ export const AgentControls = memo(function AgentControls({
       isRetryingModelProvider={snapshotIsRefreshing}
       onDropdownClose={onDropdownClose}
       disabled={!client}
+      isLiveAttach={agent.isLiveAttach}
+      liveState={piLiveHealth.bridge}
+      tailState={piLiveHealth.tail}
+      transportConnected={piLiveHealth.transportConnected}
       modeControl={modeControl}
       modelSelectorServerId={serverId}
       isCompactLayout={isCompactLayout}
@@ -1780,6 +1842,8 @@ export function DraftAgentControls({
       onRetryModelProvider={onRetryModelProvider}
       isRetryingModelProvider={isRetryingModelProvider}
       disabled={disabled}
+      tailState="disconnected"
+      transportConnected={false}
       modeControl={modeControl}
       modelSelectorServerId={modelSelectorServerId}
       isCompactLayout={isCompactLayout}
@@ -1860,6 +1924,20 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: 9,
     fontWeight: "700",
     letterSpacing: 0.4,
+  },
+  liveDiagnostics: {
+    gap: theme.spacing[3],
+    padding: theme.spacing[6],
+  },
+  liveDiagnosticsLine: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.medium,
+  },
+  liveDiagnosticsHelp: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    lineHeight: theme.fontSize.sm * 1.4,
   },
   tooltipText: {
     color: theme.colors.foreground,
