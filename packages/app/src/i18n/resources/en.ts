@@ -1191,13 +1191,13 @@ export const en = {
   },
   openProject: {
     tiles: {
+      importSession: {
+        title: "Recent sessions",
+        description: "Pick up any existing agent session",
+      },
       addProject: {
         title: "Add a project",
         description: "Open a folder on your machine",
-      },
-      importSession: {
-        title: "Import session",
-        description: "Bring in recent external CLI sessions",
       },
       setupProviders: {
         title: "Setup providers",

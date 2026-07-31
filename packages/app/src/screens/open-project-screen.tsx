@@ -96,19 +96,19 @@ export function OpenProjectScreen() {
         </View>
         <View style={styles.tiles}>
           <HomeTile
-            icon={FolderOpen}
-            title={t("openProject.tiles.addProject.title")}
-            description={t("openProject.tiles.addProject.description")}
-            onPress={handleOpenPicker}
-            testID="open-project-submit"
-            accent
-          />
-          <HomeTile
             icon={Inbox}
             title={t("openProject.tiles.importSession.title")}
             description={t("openProject.tiles.importSession.description")}
             onPress={handleOpenImportSession}
             testID="open-project-import-session"
+            accent
+          />
+          <HomeTile
+            icon={FolderOpen}
+            title={t("openProject.tiles.addProject.title")}
+            description={t("openProject.tiles.addProject.description")}
+            onPress={handleOpenPicker}
+            testID="open-project-submit"
           />
           <HomeTile
             icon={Plug}
