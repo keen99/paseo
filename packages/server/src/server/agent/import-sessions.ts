@@ -20,6 +20,17 @@ import type {
 } from "@getpaseo/protocol/messages";
 import { getParentAgentIdFromLabels, PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import { createRealpathAwarePathMatcher } from "../../utils/path.js";
+import { bridgeSocketExists } from "./providers/pi/bridge-attach.js";
+
+async function probeLiveAttachableCwds(cwds: string[]): Promise<Set<string>> {
+  const live = new Set<string>();
+  await Promise.all(
+    cwds.map(async (cwd) => {
+      if (await bridgeSocketExists(cwd)) live.add(cwd);
+    }),
+  );
+  return live;
+}
 
 type ImportAgentRequestMessage = z.infer<typeof ImportAgentRequestMessageSchema>;
 
@@ -155,14 +166,16 @@ export async function listImportableProviderSessions(
     candidates.push(session);
   }
 
-  const entries = candidates
-    .sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime())
-    .slice(0, limit)
-    .map((descriptor) =>
-      toRecentProviderSessionDescriptorPayload(descriptor, {
-        providerLabel: providerSnapshotManager.getProviderLabel(descriptor.provider),
-      }),
-    );
+  const ranked = candidates.sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime());
+  const top = ranked.slice(0, limit);
+  const cwdsToProbe = [...new Set(top.map((d) => d.cwd))];
+  const liveCwds = await probeLiveAttachableCwds(cwdsToProbe);
+  const entries = top.map((descriptor) =>
+    toRecentProviderSessionDescriptorPayload(descriptor, {
+      providerLabel: providerSnapshotManager.getProviderLabel(descriptor.provider),
+      isLiveAttachable: liveCwds.has(descriptor.cwd),
+    }),
+  );
 
   return { entries, filteredAlreadyImportedCount };
 }

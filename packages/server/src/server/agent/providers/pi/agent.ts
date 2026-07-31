@@ -64,6 +64,11 @@ import { materializeProviderImage } from "../provider-image-output.js";
 import { PiCliRuntime } from "./cli-runtime.js";
 import { revertPiConversation } from "./rewind.js";
 import { listPiImportableSessions, readPiImportSessionConfig } from "./session-descriptor.js";
+import {
+  PiBridgeAttachSession,
+  bridgeSocketPathForCwd,
+  bridgeSocketExists,
+} from "./bridge-attach.js";
 import type { PiRuntime, PiRuntimeSession, PiStartSessionInput } from "./runtime.js";
 import type {
   PiAgentSessionEvent,
@@ -223,6 +228,7 @@ interface PiRpcAgentSessionOptions {
   currentModeId?: string | null;
   cleanup?: () => void;
   extensionTimeoutMs?: number;
+  liveConnected?: boolean;
 }
 
 interface PiResumeConfig {
@@ -1244,6 +1250,7 @@ export class PiRpcAgentSession implements AgentSession {
   private outOfBandCompactionCompleted = false;
   private commandCache: AgentSlashCommand[] | null = null;
   private state: PiSessionState;
+  private liveConnected: boolean | null = null;
   private readonly currentModeId: string | null;
   private closed = false;
   // Pi reports an aborted OpenAI Responses stream before the abort RPC resolves.
@@ -1265,6 +1272,7 @@ export class PiRpcAgentSession implements AgentSession {
       this.state.thinkingLevel ??
       null;
     this.extensionTimeoutMs = options.extensionTimeoutMs ?? DEFAULT_PI_EXTENSION_RESULT_TIMEOUT_MS;
+    this.liveConnected = options.liveConnected ?? null;
 
     this.runtimeSession.onEvent((event) => {
       this.handleRuntimeEvent(event);
@@ -1365,7 +1373,9 @@ export class PiRpcAgentSession implements AgentSession {
   }
 
   async *streamHistory(): AsyncGenerator<AgentStreamEvent> {
-    await this.requestEntryCapture("history");
+    if (!this.runtimeSession.isLiveBridge) {
+      await this.requestEntryCapture("history");
+    }
     yield* streamPiHistory(
       this.provider,
       await this.runtimeSession.getMessages(),
@@ -1441,6 +1451,11 @@ export class PiRpcAgentSession implements AgentSession {
         ...(this.currentModeId ? { modeId: this.currentModeId } : {}),
       },
     };
+  }
+
+  getLiveState(): "connected" | "disconnected" | "none" {
+    if (this.liveConnected === null) return "none";
+    return this.liveConnected ? "connected" : "disconnected";
   }
 
   async interrupt(): Promise<void> {
@@ -2034,6 +2049,15 @@ export class PiRpcAgentSession implements AgentSession {
       }
       return;
     }
+    if (event.type === "live_disconnected" || event.type === "live_connected") {
+      this.liveConnected = event.type === "live_connected";
+      this.emit({
+        type: "live_state_changed",
+        provider: this.provider,
+        liveState: this.liveConnected ? "connected" : "disconnected",
+      });
+      return;
+    }
     if (isPiAgentSessionEvent(event)) {
       this.handleSessionEvent(event);
       return;
@@ -2225,6 +2249,18 @@ export class PiRpcAgentSession implements AgentSession {
   private handleMessageStart(event: Extract<PiAgentSessionEvent, { type: "message_start" }>): void {
     if (event.message.role === "assistant") {
       this.activeAssistantMessageId = event.message.responseId || null;
+      return;
+    }
+    if (event.message.role === "user" && this.activeClientMessageId === null) {
+      const text = getUserMessageText(event.message.content);
+      if (text && !text.startsWith(`/${PASEO_PI_CAPTURE_EXTENSION_COMMAND} `)) {
+        this.emit({
+          type: "timeline",
+          provider: this.provider,
+          turnId: this.currentTurnIdForEvent(),
+          item: { type: "user_message", text },
+        });
+      }
     }
   }
 
@@ -2426,6 +2462,22 @@ export class PiRpcAgentClient implements AgentClient {
     const persistenceMetadata = parsePersistenceMetadata(handle.metadata);
     const resumeConfig = buildResumeConfig(persistenceMetadata, overrides, this.provider);
 
+    if (await bridgeSocketExists(resumeConfig.cwd)) {
+      try {
+        return await this.attachToLiveSession({
+          cwd: resumeConfig.cwd,
+          config: resumeConfig.config,
+          expectedSessionFile: sessionFile,
+          expectedSessionId: handle.sessionId,
+        });
+      } catch (error) {
+        this.logger.debug(
+          { err: error, cwd: resumeConfig.cwd, sessionId: handle.sessionId },
+          "Live Pi bridge did not match persisted session; falling back to provider resume",
+        );
+      }
+    }
+
     const mcpEnv = {
       ...this.runtimeSettings?.env,
       ...launchContext?.env,
@@ -2501,6 +2553,58 @@ export class PiRpcAgentClient implements AgentClient {
       ...options,
       sessionDir: this.providerParams.sessionDir,
       runtimeSettings: this.runtimeSettings,
+    });
+  }
+
+  /**
+   * Attach to a LIVE pi process via the paseo bridge extension socket.
+   * No spawn. Two-way: stream events out, send prompts/steers in.
+   * Requires the pi process to have the bridge extension loaded.
+   */
+  async attachToLiveSession(input: {
+    cwd: string;
+    config: AgentSessionConfig;
+    expectedSessionFile?: string;
+    expectedSessionId?: string;
+  }): Promise<AgentSession> {
+    const socketPath = bridgeSocketPathForCwd(input.cwd);
+    const exists = await bridgeSocketExists(input.cwd);
+    if (!exists) {
+      throw new Error(
+        `No live pi bridge socket at ${socketPath}. Start pi with the paseo bridge extension.`,
+      );
+    }
+    const attach = new PiBridgeAttachSession(socketPath);
+    try {
+      const hello = await attach.ready();
+      const sessionFileMatches =
+        input.expectedSessionFile === undefined ||
+        (hello.sessionFile !== null &&
+          resolvePath(hello.sessionFile) === resolvePath(input.expectedSessionFile));
+      const sessionIdMatches =
+        input.expectedSessionId === undefined || hello.sessionId === input.expectedSessionId;
+      if (!sessionFileMatches || !sessionIdMatches) {
+        throw new Error(
+          `Live Pi bridge session mismatch (expected ${input.expectedSessionId ?? input.expectedSessionFile ?? "unknown"}, received ${hello.sessionId ?? hello.sessionFile ?? "unknown"})`,
+        );
+      }
+    } catch (error) {
+      await attach.close().catch(() => undefined);
+      throw error;
+    }
+    return new PiRpcAgentSession({
+      runtimeSession: attach as unknown as PiRuntimeSession,
+      config: input.config,
+      initialState: await attach.getState(),
+      capabilities: {
+        ...PI_CAPABILITIES,
+        supportsMcpServers: false,
+      },
+      cleanup: () => {
+        void attach.close().catch(() => undefined);
+      },
+      liveConnected: true,
+      extensionTimeoutMs: this.providerParams.extensionTimeoutMs,
     });
   }
 

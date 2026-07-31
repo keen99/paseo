@@ -432,6 +432,11 @@ export type AgentStreamEvent =
       type: "provider_subagent";
       provider: AgentProvider;
       event: import("./provider-subagents/store.js").ProviderSubagentInputEvent;
+    }
+  | {
+      type: "live_state_changed";
+      provider: AgentProvider;
+      liveState: "connected" | "disconnected" | "none";
     };
 
 export function getAgentStreamEventTurnId(event: AgentStreamEvent): string | undefined {
@@ -524,6 +529,8 @@ export interface ImportableProviderSession {
   firstPromptPreview: string | null;
   lastPromptPreview: string | null;
   lastActivityAt: Date;
+  /** True when a live provider process bridge socket is reachable for this cwd. */
+  isLiveAttachable?: boolean;
 }
 
 export interface ImportProviderSessionInput {
@@ -635,6 +642,7 @@ export interface AgentSession {
     response: AgentPermissionResponse,
   ): Promise<AgentPermissionResult | void>;
   describePersistence(): AgentPersistenceHandle | null;
+  getLiveState?(): "connected" | "disconnected" | "none";
   interrupt(): Promise<void>;
   /** Release live runtime resources without archiving or deleting the durable native session. */
   close(): Promise<void>;
@@ -715,6 +723,16 @@ export interface AgentClient {
     input: ImportProviderSessionInput,
     context: ImportProviderSessionContext,
   ): Promise<ImportedProviderSession>;
+  /**
+   * Attach to a LIVE running provider process (no spawn).
+   * Requires provider-side bridge/socket support. Currently pi only.
+   */
+  attachToLiveSession?(input: {
+    cwd: string;
+    config: AgentSessionConfig;
+    expectedSessionFile?: string;
+    expectedSessionId?: string;
+  }): Promise<AgentSession>;
   /**
    * Check if this provider is available (CLI binary is installed).
    * Returns true if available, false otherwise.

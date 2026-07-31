@@ -105,6 +105,22 @@ const serverEnv = {
   ...(SKIP_BUILD ? { PASEO_SKIP_DEV_SERVER_BUILD: "1" } : {}),
 };
 
+// clear stale metro/expo cache so HMR picks up source changes
+const cacheDirs = [
+  join(ROOT, "packages/app/.expo/web"),
+  join(ROOT, "packages/app/node_modules/.cache/metro"),
+];
+for (const dir of cacheDirs) {
+  try {
+    if (existsSync(dir)) {
+      rmSync(dir, { recursive: true, force: true });
+      line("sys", `cleared cache: ${dir}`);
+    }
+  } catch (e) {
+    line("sys", `cache clear failed (${dir}): ${e?.message ?? e}`);
+  }
+}
+
 spawnProc("server", "npm", ["run", "dev:server"], serverEnv);
 
 // slight delay so server binds before app tries to connect

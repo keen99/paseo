@@ -39,6 +39,7 @@ export interface PiStartSessionInput {
 }
 
 export interface PiRuntimeSession {
+  readonly isLiveBridge?: boolean;
   onEvent(callback: (event: PiRuntimeEvent) => void): () => void;
   prompt(
     message: string,

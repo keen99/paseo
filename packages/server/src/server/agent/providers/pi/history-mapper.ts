@@ -96,7 +96,7 @@ export class PiHistoryMapper {
   private mapUserMessage(message: Extract<PiAgentMessage, { role: "user" }>): AgentStreamEvent[] {
     const text = getUserMessageText(message.content);
     this.userIndex += 1;
-    if (!text) {
+    if (!text || text.startsWith("/paseo_capture_entries ")) {
       return [];
     }
     const userEntry = this.userEntries[this.userIndex - 1];

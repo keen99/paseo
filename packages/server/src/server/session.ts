@@ -34,6 +34,7 @@ import { SortablePager, type SortSpec } from "./pagination/sortable-pager.js";
 import type { SpeechToTextProvider, TextToSpeechProvider } from "./speech/speech-provider.js";
 import type { TurnDetectionProvider } from "./speech/turn-detection-provider.js";
 import { isStoredAgentProviderAvailable, toAgentPersistenceHandle } from "./persistence-hooks.js";
+import type { AgentProvider } from "@getpaseo/protocol/agent-types";
 import { ensureAgentLoaded, ensureUnarchivedAgentLoaded } from "./agent/agent-loading.js";
 import {
   formatSystemNotificationPrompt,
@@ -1944,6 +1945,8 @@ export class Session {
         return this.handleResumeAgentRequest(msg);
       case "import_agent_request":
         return this.handleImportAgentRequest(msg);
+      case "attach_live_agent_request":
+        return this.handleAttachLiveAgentRequest(msg);
       case "refresh_agent_request":
         return this.handleRefreshAgentRequest(msg);
       case "cancel_agent_request":
@@ -3314,6 +3317,85 @@ export class Session {
           timestamp: new Date(),
           type: "error",
           content: `Failed to import agent: ${message}`,
+        },
+      });
+    }
+  }
+
+  private async handleAttachLiveAgentRequest(
+    msg: Extract<SessionInboundMessage, { type: "attach_live_agent_request" }>,
+  ): Promise<void> {
+    const { requestId } = msg;
+    const provider = msg.providerId ?? msg.provider;
+    if (!provider) {
+      this.emit({
+        type: "status",
+        payload: {
+          status: "agent_create_failed",
+          requestId,
+          error: "Attach requires providerId",
+        },
+      });
+      return;
+    }
+    const cwd = msg.cwd?.trim();
+    if (!cwd) {
+      this.emit({
+        type: "status",
+        payload: {
+          status: "agent_create_failed",
+          requestId,
+          error: "Attach requires cwd",
+        },
+      });
+      return;
+    }
+    this.sessionLogger.info({ provider, cwd }, `Attaching live agent (${provider})`);
+
+    try {
+      const placement = await this.workspaceProvisioning.runInImportWorkspace(
+        { cwd, requestedWorkspaceId: msg.workspaceId },
+        async (workspace) =>
+          this.agentManager.attachLiveSession({
+            provider: provider as AgentProvider,
+            providerHandleId: msg.providerHandleId,
+            cwd,
+            workspaceId: workspace.workspaceId,
+            ...(msg.labels ? { labels: msg.labels } : {}),
+          }),
+      );
+      if (placement.createdWorkspace) {
+        await this.registerWorkspaceForImportedAgent(placement.createdWorkspace);
+      }
+      const agentPayload = await this.buildAgentPayload(placement.value);
+      this.emit({
+        type: "status",
+        payload: {
+          status: "agent_resumed",
+          agentId: placement.value.id,
+          requestId,
+          timelineSize: 0,
+          agent: agentPayload,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.sessionLogger.error({ err: error }, "Failed to attach live agent");
+      this.emit({
+        type: "status",
+        payload: {
+          status: "agent_create_failed",
+          requestId,
+          error: message,
+        },
+      });
+      this.emit({
+        type: "activity_log",
+        payload: {
+          id: uuidv4(),
+          timestamp: new Date(),
+          type: "error",
+          content: `Failed to attach live agent: ${message}`,
         },
       });
     }

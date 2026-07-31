@@ -114,6 +114,8 @@ interface ControlledAgentControlsProps {
   modeControl?: AgentModeControlValue | null;
   modelSelectorServerId?: string | null;
   isCompactLayout?: boolean;
+  isLiveAttach?: boolean;
+  liveState?: "connected" | "disconnected" | "none";
 }
 
 export interface DraftAgentControlsProps {
@@ -150,6 +152,11 @@ interface AgentControlsProps {
   isPaneFocused: boolean;
   onDropdownClose?: () => void;
   isCompactLayout?: boolean;
+}
+
+export interface DraftAgentControlsProps {
+  isLiveAttach?: boolean;
+  liveState?: "connected" | "disconnected" | "none";
 }
 
 function findOptionLabel(
@@ -329,6 +336,8 @@ type AgentControlsSlice = {
   features: AgentFeature[] | undefined;
   thinkingOptionId: string | null | undefined;
   lastUsage: unknown;
+  isLiveAttach: boolean;
+  liveState: "connected" | "disconnected" | "none";
 } | null;
 
 function selectAgentControlsSlice(
@@ -348,6 +357,8 @@ function selectAgentControlsSlice(
     features: currentAgent.features,
     thinkingOptionId: currentAgent.thinkingOptionId,
     lastUsage: currentAgent.lastUsage,
+    isLiveAttach: currentAgent.isLiveAttach ?? false,
+    liveState: currentAgent.liveState ?? "none",
   };
 }
 
@@ -418,6 +429,8 @@ function ControlledAgentControls({
   onModelSelectorOpen,
   onRetryModelProvider,
   isRetryingModelProvider = false,
+  isLiveAttach = false,
+  liveState = "none",
   modeControl,
   modelSelectorServerId = null,
   isCompactLayout,
@@ -679,6 +692,8 @@ function ControlledAgentControls({
             comboboxProviderOptions={comboboxProviderOptions}
             comboboxThinkingOptions={comboboxThinkingOptions}
             displayProvider={displayProvider}
+            isLiveAttach={isLiveAttach}
+            liveState={liveState}
             displayThinking={displayThinking}
             openSelector={openSelector}
             providerAnchorRef={providerAnchorRef}
@@ -767,6 +782,8 @@ interface DesktopAgentControlsContentProps {
   comboboxProviderOptions: ComboboxOption[];
   comboboxThinkingOptions: ComboboxOption[];
   displayProvider: string;
+  isLiveAttach: boolean;
+  liveState: "connected" | "disconnected" | "none";
   displayThinking: string;
   openSelector: AgentControlSelector | null;
   providerAnchorRef: RefObject<View | null>;
@@ -825,6 +842,7 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
     modelDisabled,
     comboboxProviderOptions,
     comboboxThinkingOptions,
+    liveState,
     displayProvider,
     displayThinking,
     openSelector,
@@ -885,6 +903,22 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
             desktopPlacement="top-start"
           />
         </>
+      ) : null}
+
+      {/* TODO(pi-live-diagnostics): Make badge clickable; show socket state, session match, reconnect attempts, and doctor actions. */}
+      {provider === "pi" ? (
+        <View
+          style={[
+            styles.liveBadge,
+            liveState === "connected" ? styles.liveBadgeConnected : styles.liveBadgeDisconnected,
+          ]}
+          accessible
+          accessibilityLabel={`Pi live connection: ${liveState}`}
+        >
+          <Text style={styles.liveBadgeText}>
+            {liveState === "connected" ? "LIVE" : "DISCONNECTED"}
+          </Text>
+        </View>
       ) : null}
 
       {canSelectModel ? (
@@ -1806,6 +1840,26 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.sm,
     fontWeight: theme.fontWeight.normal,
+  },
+  liveBadge: {
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  liveBadgeConnected: {
+    backgroundColor: "#15803d",
+  },
+  liveBadgeDisconnected: {
+    backgroundColor: "#b91c1c",
+  },
+  liveBadgeIdle: {
+    backgroundColor: theme.colors.foregroundMuted,
+  },
+  liveBadgeText: {
+    color: "#ffffff",
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0.4,
   },
   tooltipText: {
     color: theme.colors.foreground,

@@ -57,5 +57,7 @@ export function normalizeAgentSnapshot(snapshot: AgentSnapshotPayload, serverId:
     archivedAt,
     parentAgentId,
     labels: snapshot.labels,
+    isLiveAttach: snapshot.labels?.["paseo.live"] === "1",
+    liveState: snapshot.liveState ?? "none",
   };
 }

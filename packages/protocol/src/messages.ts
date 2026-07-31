@@ -713,6 +713,7 @@ export const AgentSnapshotPayloadSchema = z.object({
   attentionTimestamp: z.string().nullable().optional(),
   archivedAt: z.string().nullable().optional(),
   providerUnavailable: z.boolean().optional(),
+  liveState: z.enum(["connected", "disconnected", "none"]).optional(),
 });
 
 export type AgentSnapshotPayload = z.infer<typeof AgentSnapshotPayloadSchema>;
@@ -751,6 +752,7 @@ export const RecentProviderSessionDescriptorPayloadSchema = z.object({
   firstPromptPreview: z.string().nullable(),
   lastPromptPreview: z.string().nullable(),
   lastActivityAt: z.string(),
+  isLiveAttachable: z.boolean().optional(),
 });
 
 export type RecentProviderSessionDescriptorPayload = z.infer<
@@ -1329,6 +1331,17 @@ export const ImportAgentRequestMessageSchema = z.object({
   sessionId: z.string().optional(),
   providerHandleId: z.string().optional(),
   cwd: z.string().optional(),
+  workspaceId: z.string().optional(),
+  labels: z.record(z.string(), z.string()).optional(),
+  requestId: z.string(),
+});
+
+export const AttachLiveAgentRequestMessageSchema = z.object({
+  type: z.literal("attach_live_agent_request"),
+  provider: AgentProviderSchema.optional(),
+  providerId: z.string().optional(),
+  providerHandleId: z.string().optional(),
+  cwd: z.string(),
   workspaceId: z.string().optional(),
   labels: z.record(z.string(), z.string()).optional(),
   requestId: z.string(),
@@ -2490,6 +2503,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ProviderUsageListRequestMessageSchema,
   ResumeAgentRequestMessageSchema,
   ImportAgentRequestMessageSchema,
+  AttachLiveAgentRequestMessageSchema,
   RefreshAgentRequestMessageSchema,
   CancelAgentRequestMessageSchema,
   ShutdownServerRequestMessageSchema,

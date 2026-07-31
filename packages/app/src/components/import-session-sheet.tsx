@@ -37,7 +37,8 @@ const DISABLED_ACCESSIBILITY_STATE = { disabled: true };
 type RecentProviderSessionsClient = Pick<
   DaemonClient,
   "fetchRecentProviderSessions" | "importAgent"
->;
+> &
+  Partial<Pick<DaemonClient, "attachLiveAgent">>;
 
 type ImportedAgent = Awaited<ReturnType<RecentProviderSessionsClient["importAgent"]>>;
 
@@ -241,6 +242,11 @@ function ImportSessionSheetRow({
           <Text style={styles.rowTitle} numberOfLines={1}>
             {title}
           </Text>
+          {entry.isLiveAttachable ? (
+            <View style={styles.liveBadge}>
+              <Text style={styles.liveBadgeText}>LIVE</Text>
+            </View>
+          ) : null}
           <Text style={styles.rowMeta}>
             {importing ? t("importSession.row.importing") : lastActivity}
           </Text>
@@ -414,12 +420,20 @@ export function ImportSessionSheet({
       if (!entry.cwd) {
         throw new Error("Session is missing a working directory");
       }
-      const agent = await client.importAgent({
-        providerId: entry.providerId,
-        providerHandleId: entry.providerHandleId,
-        cwd: entry.cwd,
-        ...(workspaceId ? { workspaceId } : {}),
-      });
+      const agent =
+        entry.isLiveAttachable && client.attachLiveAgent
+          ? await client.attachLiveAgent({
+              providerId: entry.providerId,
+              providerHandleId: entry.providerHandleId,
+              cwd: entry.cwd,
+              ...(workspaceId ? { workspaceId } : {}),
+            })
+          : await client.importAgent({
+              providerId: entry.providerId,
+              providerHandleId: entry.providerHandleId,
+              cwd: entry.cwd,
+              ...(workspaceId ? { workspaceId } : {}),
+            });
       return agent;
     },
     onSuccess: async (agent) => {
@@ -617,9 +631,21 @@ const styles = StyleSheet.create((theme) => ({
   },
   rowHeader: {
     flexDirection: "row",
-    alignItems: "baseline",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: theme.spacing[2],
+  },
+  liveBadge: {
+    paddingHorizontal: theme.spacing[1.5],
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.accent,
+  },
+  liveBadgeText: {
+    color: theme.colors.surface0,
+    fontSize: theme.fontSize.xs,
+    fontWeight: theme.fontWeight.bold,
+    letterSpacing: 0.5,
   },
   rowTitle: {
     flex: 1,

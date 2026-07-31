@@ -31,6 +31,7 @@ function createSnapshot(
     persistence: input.persistence ?? null,
     title: input.title ?? null,
     labels: (input.labels ?? {}) as AgentSnapshotPayload["labels"],
+    liveState: input.liveState,
   };
 }
 
@@ -70,5 +71,18 @@ describe("normalizeAgentSnapshot", () => {
     expect(missing.parentAgentId).toBeNull();
     expect(empty.parentAgentId).toBeNull();
     expect(nonString.parentAgentId).toBeNull();
+  });
+
+  it("normalizes live attach and connection state", () => {
+    const connected = normalizeAgentSnapshot(
+      createSnapshot({ labels: { "paseo.live": "1" }, liveState: "connected" }),
+      "server-1",
+    );
+    const ordinary = normalizeAgentSnapshot(createSnapshot(), "server-1");
+
+    expect(connected.isLiveAttach).toBe(true);
+    expect(connected.liveState).toBe("connected");
+    expect(ordinary.isLiveAttach).toBe(false);
+    expect(ordinary.liveState).toBe("none");
   });
 });

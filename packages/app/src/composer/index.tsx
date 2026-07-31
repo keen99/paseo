@@ -1072,6 +1072,9 @@ export function Composer({
   const { settings: appSettings } = useAppSettings();
 
   const agentState = useSessionStore(useShallow(buildAgentStateSelector(serverId, agentId)));
+  const agentLiveState = useSessionStore(
+    (state) => state.sessions[serverId]?.agents?.get(agentId)?.liveState ?? "none",
+  );
 
   const queuedMessagesRaw = useSessionStore((state) =>
     state.sessions[serverId]?.queuedMessages?.get(agentId),
@@ -1086,7 +1089,10 @@ export function Composer({
   const isCompactLayout = resolveCompactLayout(isCompactLayoutOverride, isCompactFormFactor);
   const isDesktopWebBreakpoint = resolveIsDesktopWebBreakpoint(isCompactFormFactor);
   const isDesktopLayout = resolveIsDesktopWebBreakpoint(isCompactLayout);
-  const messagePlaceholder = resolveMessagePlaceholder(isDesktopLayout, t);
+  const isPiLiveDisconnected = agentState.provider === "pi" && agentLiveState !== "connected";
+  const messagePlaceholder = isPiLiveDisconnected
+    ? "Pi session disconnected — reload bridge or reconnect"
+    : resolveMessagePlaceholder(isDesktopLayout, t);
   const userInput = value;
   const setUserInput = onChangeText;
   const workspaceAttachments = useWorkspaceAttachmentsForScopes(attachmentScopeKeys);
@@ -1413,6 +1419,10 @@ export function Composer({
 
   const handleSubmit = useCallback(
     (payload: MessagePayload) => {
+      if (isPiLiveDisconnected) {
+        setSendError("Pi session is disconnected. Reload bridge or reconnect.");
+        return;
+      }
       const outgoingAttachments = buildOutgoingAttachments(attachments);
       const clientSlashCommand = resolveClientSlashCommand({
         text: payload.text,
@@ -1431,6 +1441,7 @@ export function Composer({
       attachments,
       blurOnSubmit,
       buildOutgoingAttachments,
+      isPiLiveDisconnected,
       runClientSlashCommand,
       sendMessageWithContent,
     ],
@@ -2036,7 +2047,7 @@ export function Composer({
       onGenericFiles: handleGenericFilesDropped,
       onWorkspaceFile: handleWorkspaceFileDropped,
     },
-    { disabled: isSubmitBusy },
+    { disabled: isSubmitBusy || isPiLiveDisconnected },
   );
 
   const messageInputAutoFocus = autoFocus && isDesktopWebBreakpoint;
@@ -2084,7 +2095,7 @@ export function Composer({
                 submitButtonAccessibilityLabel={submitButtonAccessibilityLabel}
                 submitButtonTestID={submitButtonTestID}
                 submitIcon={submitIcon}
-                isSubmitDisabled={isSubmitBusy}
+                isSubmitDisabled={isSubmitBusy || isPiLiveDisconnected}
                 isSubmitLoading={isSubmitBusy}
                 preserveHeightOnSubmit={submitBehavior === "preserve-and-lock"}
                 attachments={selectedAttachments}
@@ -2097,7 +2108,7 @@ export function Composer({
                 placeholder={messagePlaceholder}
                 autoFocus={messageInputAutoFocus}
                 autoFocusKey={`${serverId}:${agentId}:${autoFocusKey ?? ""}`}
-                disabled={isSubmitLoading}
+                disabled={isSubmitLoading || isPiLiveDisconnected}
                 isPaneFocused={isPaneFocused}
                 leftContent={leftContent}
                 beforeVoiceContent={beforeVoiceContent}

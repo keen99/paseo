@@ -30,6 +30,7 @@ interface ProjectionOptions {
 
 interface RecentProviderSessionProjectionOptions {
   providerLabel: string;
+  isLiveAttachable?: boolean;
 }
 
 function normalizeThinkingOptionId(value: string | null | undefined): string | null {
@@ -130,6 +131,11 @@ export function toAgentPayload(
     title: options?.title ?? null,
     labels: agent.labels,
   };
+
+  const liveState = agent.session?.getLiveState?.();
+  if (liveState) {
+    payload.liveState = liveState;
+  }
 
   const usage = sanitizeUsage(agent.lastUsage);
   if (usage !== undefined) {
@@ -276,6 +282,7 @@ export function toRecentProviderSessionDescriptorPayload(
     firstPromptPreview: session.firstPromptPreview,
     lastPromptPreview: session.lastPromptPreview,
     lastActivityAt: session.lastActivityAt.toISOString(),
+    ...(options.isLiveAttachable ? { isLiveAttachable: true } : {}),
   };
 }
 

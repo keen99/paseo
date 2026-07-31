@@ -20,9 +20,14 @@ const customWebPlatform = (process.env.PASEO_WEB_PLATFORM ?? "")
 const config = getDefaultConfig(projectRoot);
 const defaultResolveRequest = config.resolver.resolveRequest ?? resolve;
 
-// Keep app exports deterministic across dev machines and CI. Metro's Watchman
-// crawler behavior depends on the host Watchman build/capabilities, while the
-// node crawler is the path used when Watchman is absent.
+// Paseo's monorepo links app code and freshly rebuilt workspace packages. Metro's
+// persistent transform cache can retain an old graph after those files change,
+// causing both reloads and HMR to serve stale code. Always transform from current
+// files; Metro still retains its in-process module graph for fast incremental HMR.
+config.cacheStores = [];
+
+// Watchman is not guaranteed on developer machines. Use Metro's node crawler,
+// which watches the same source files without an external service.
 config.resolver.useWatchman = false;
 
 const escapedAppSrcRoot = appSrcRoot

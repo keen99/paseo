@@ -1193,6 +1193,70 @@ export class AgentManager {
     }
   }
 
+  attachLiveSession(input: {
+    provider: AgentProvider;
+    providerHandleId?: string;
+    cwd: string;
+    workspaceId: string;
+    labels?: Record<string, string>;
+  }): Promise<ManagedAgent> {
+    return this.trackAgentRegistrationOperation(this.attachLiveSessionInternal(input));
+  }
+
+  private async attachLiveSessionInternal(input: {
+    provider: AgentProvider;
+    providerHandleId?: string;
+    cwd: string;
+    workspaceId: string;
+    labels?: Record<string, string>;
+  }): Promise<ManagedAgent> {
+    this.assertAcceptingAgentRegistrations();
+    const resolvedAgentId = validateAgentId(this.idFactory(), "attachLiveSession");
+    this.requireEnabledProvider(input.provider);
+
+    const client = await this.requireAvailableClient({ provider: input.provider });
+    if (!client.attachToLiveSession) {
+      throw new Error(`Provider '${input.provider}' does not support live session attach`);
+    }
+
+    const { storedConfig, launchConfig } = await this.prepareSessionConfig(
+      {
+        provider: input.provider,
+        cwd: input.cwd,
+      },
+      resolvedAgentId,
+    );
+    const launchContext = await this.buildLaunchContext(resolvedAgentId, client, storedConfig.cwd);
+    const providerLaunchConfig = this.resolveProviderLaunchConfig(launchConfig, launchContext);
+
+    const session = await client.attachToLiveSession({
+      cwd: input.cwd,
+      config: providerLaunchConfig,
+      ...(input.providerHandleId ? { expectedSessionFile: input.providerHandleId } : {}),
+    });
+
+    let handedToRegistration = false;
+    try {
+      const attachedConfig = await this.normalizeConfig(
+        stripInternalPaseoMcpServer(providerLaunchConfig),
+      );
+      handedToRegistration = true;
+      const agent = await this.registerSession(session, attachedConfig, resolvedAgentId, {
+        labels: { ...input.labels, "paseo.live": "1" },
+        workspaceId: input.workspaceId,
+        timelineRows: [],
+        timelineNextSeq: 1,
+        historyPrimed: false,
+        publishWhenReady: true,
+      });
+      return agent;
+    } finally {
+      if (!handedToRegistration) {
+        await this.closeUnregisteredSession(session);
+      }
+    }
+  }
+
   // Hot-reload an active agent session with config overrides. By default the
   // in-memory timeline is preserved (used for voice-mode toggles and similar
   // config swaps). When `rehydrateFromDisk` is set, the timeline is wiped so a
@@ -3459,6 +3523,10 @@ export class AgentManager {
             thinkingOptionId: event.thinkingOptionId,
           };
         }
+        flags.shouldDispatchEvent = false;
+        this.emitState(agent);
+        return undefined;
+      case "live_state_changed":
         flags.shouldDispatchEvent = false;
         this.emitState(agent);
         return undefined;

@@ -121,6 +121,8 @@ export interface Agent {
   archivedAt?: Date | null;
   parentAgentId: string | null;
   labels: Record<string, string>;
+  isLiveAttach?: boolean;
+  liveState?: "connected" | "disconnected" | "none";
   projectPlacement?: ProjectPlacementPayload | null;
 }
 

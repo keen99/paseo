@@ -33,7 +33,7 @@
     "packages/cli"
   ],
   "scripts": {
-    "dev": "npm run dev:server",
+    "dev": "concurrently --kill-others-on-fail --names server,app --prefix-colors cyan,magenta \"npm run dev:server\" \"npm run dev:app\"",
     "dev:win": "powershell ./scripts/dev.ps1",
     "dev:server": "cross-env PASEO_LISTEN=127.0.0.1:6768 ./scripts/dev-daemon.sh",
     "dev:server:watch": "concurrently --kill-others --names protocol,client,server --prefix-colors yellow,blue,cyan \"npm run watch:protocol\" \"npm run watch:client\" \"npm run dev:server:raw\"",

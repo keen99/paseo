@@ -2687,6 +2687,53 @@ export class DaemonClient {
     return status.agent;
   }
 
+  async attachLiveAgent(input: {
+    providerId: string;
+    providerHandleId?: string;
+    cwd: string;
+    workspaceId?: string;
+    labels?: Record<string, string>;
+  }): Promise<AgentSnapshotPayload> {
+    const requestId = this.createRequestId();
+    const message = SessionInboundMessageSchema.parse({
+      type: "attach_live_agent_request",
+      requestId,
+      providerId: input.providerId,
+      ...(input.providerHandleId ? { providerHandleId: input.providerHandleId } : {}),
+      cwd: input.cwd,
+      ...(input.workspaceId ? { workspaceId: input.workspaceId } : {}),
+      ...(input.labels && Object.keys(input.labels).length > 0 ? { labels: input.labels } : {}),
+    });
+
+    const status = await this.sendRequest({
+      requestId,
+      message,
+      options: { skipQueue: true },
+      select: (msg) => {
+        if (msg.type !== "status") {
+          return null;
+        }
+        const resumed = AgentResumedStatusPayloadSchema.safeParse(msg.payload);
+        if (resumed.success && resumed.data.requestId === requestId) {
+          return resumed.data;
+        }
+
+        const failed = AgentCreateFailedStatusPayloadSchema.safeParse(msg.payload);
+        if (failed.success && failed.data.requestId === requestId) {
+          return failed.data;
+        }
+
+        return null;
+      },
+    });
+
+    if (status.status === "agent_create_failed") {
+      throw new Error(status.error);
+    }
+
+    return status.agent;
+  }
+
   async refreshAgent(agentId: string, requestId?: string): Promise<AgentRefreshedStatusPayload> {
     const resolvedRequestId = this.createRequestId(requestId);
     const message = SessionInboundMessageSchema.parse({
