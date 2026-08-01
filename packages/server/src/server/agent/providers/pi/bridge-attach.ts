@@ -5,7 +5,7 @@
  * See bridge-extension.mjs for protocol.
  */
 import { connect, type Socket } from "node:net";
-import { stat } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import { resolve as resolvePath } from "node:path";
 import type {
   PiAgentMessage,
@@ -26,25 +26,125 @@ export interface BridgeHello {
 }
 
 const CONNECT_TIMEOUT_MS = 5_000;
+const DISCOVERY_TIMEOUT_MS = 750;
 const HEARTBEAT_STALE_MS = 7_000;
+const BRIDGE_SOCKET_DIR = "/tmp";
+const BRIDGE_SOCKET_PREFIX = "paseo-pi-bridge-session-";
+const BRIDGE_SOCKET_SUFFIX = ".sock";
 
-/** Build the bridge socket path for a cwd (mirrors bridge-extension socketPathFor). */
-export function bridgeSocketPathForCwd(cwd: string): string {
-  const slug = String(cwd || "default")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(-80);
-  return `/tmp/paseo-pi-bridge-${slug}.sock`;
+export interface DiscoveredPiBridge extends BridgeHello {
+  socketPath: string;
 }
 
-/** Probe whether a live bridge socket exists for the given cwd. */
-export async function bridgeSocketExists(cwd: string): Promise<boolean> {
-  try {
-    const s = await stat(bridgeSocketPathForCwd(cwd));
-    return s.isFile() || s.isSocket();
-  } catch {
-    return false;
+/** Build session-addressed bridge path. Mirrors bridge-extension socketPathForSession. */
+export function bridgeSocketPathForSession(sessionId: string): string {
+  const slug = String(sessionId)
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(-96);
+  if (!slug) {
+    throw new Error("Pi bridge requires a session id");
   }
+  return `${BRIDGE_SOCKET_DIR}/${BRIDGE_SOCKET_PREFIX}${slug}${BRIDGE_SOCKET_SUFFIX}`;
+}
+
+function matchesSessionFile(actual: string | null, expected: string | undefined): boolean {
+  return (
+    expected === undefined || (actual !== null && resolvePath(actual) === resolvePath(expected))
+  );
+}
+
+function bridgeMatches(
+  bridge: BridgeHello,
+  expected: { cwd?: string; expectedSessionFile?: string; expectedSessionId?: string },
+): boolean {
+  return (
+    (expected.cwd === undefined || resolvePath(bridge.cwd) === resolvePath(expected.cwd)) &&
+    matchesSessionFile(bridge.sessionFile, expected.expectedSessionFile) &&
+    (expected.expectedSessionId === undefined || bridge.sessionId === expected.expectedSessionId)
+  );
+}
+
+async function probeBridgeSocket(socketPath: string): Promise<DiscoveredPiBridge | null> {
+  return await new Promise((resolve) => {
+    const socket = connect(socketPath);
+    let buffer = "";
+    let settled = false;
+    const finish = (value: DiscoveredPiBridge | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      socket.destroy();
+      // oxlint-disable-next-line promise/no-multiple-resolved -- settled guard makes finish idempotent.
+      resolve(value);
+    };
+    const timer = setTimeout(() => finish(null), DISCOVERY_TIMEOUT_MS);
+    timer.unref?.();
+    socket.setEncoding("utf8");
+    socket.on("data", (chunk: string) => {
+      buffer += chunk;
+      const newline = buffer.indexOf("\n");
+      if (newline < 0) return;
+      try {
+        const message = JSON.parse(buffer.slice(0, newline)) as Record<string, unknown>;
+        if (message.dir !== "out" || message.type !== "hello") {
+          finish(null);
+          return;
+        }
+        const state = (message.state ?? {}) as Partial<BridgeHello>;
+        if (!state.sessionId || !state.sessionFile || !state.cwd) {
+          finish(null);
+          return;
+        }
+        finish({
+          socketPath,
+          sessionFile: state.sessionFile,
+          sessionId: state.sessionId,
+          sessionName: state.sessionName ?? null,
+          cwd: state.cwd,
+          isStreaming: state.isStreaming ?? false,
+        });
+      } catch {
+        finish(null);
+      }
+    });
+    socket.once("error", () => finish(null));
+  });
+}
+
+/** Discover every live Pi bridge, optionally narrowed to exact session identity. */
+export async function discoverLivePiBridges(
+  expected: { cwd?: string; expectedSessionFile?: string; expectedSessionId?: string } = {},
+): Promise<DiscoveredPiBridge[]> {
+  let names: string[];
+  try {
+    names = await readdir(BRIDGE_SOCKET_DIR);
+  } catch {
+    return [];
+  }
+  const paths = names
+    .filter((name) => name.startsWith(BRIDGE_SOCKET_PREFIX) && name.endsWith(BRIDGE_SOCKET_SUFFIX))
+    .map((name) => `${BRIDGE_SOCKET_DIR}/${name}`);
+  const bridges = await Promise.all(paths.map(probeBridgeSocket));
+  return bridges.filter(
+    (bridge): bridge is DiscoveredPiBridge => bridge !== null && bridgeMatches(bridge, expected),
+  );
+}
+
+/** Probe whether an exact live bridge exists. Cwd-only queries mean any live session in cwd. */
+export async function bridgeSocketExists(
+  cwd: string,
+  expected: { expectedSessionFile?: string; expectedSessionId?: string } = {},
+): Promise<boolean> {
+  return (
+    (
+      await discoverLivePiBridges({
+        cwd,
+        expectedSessionFile: expected.expectedSessionFile,
+        expectedSessionId: expected.expectedSessionId,
+      })
+    ).length > 0
+  );
 }
 
 interface PendingRequest {

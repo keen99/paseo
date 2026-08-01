@@ -149,12 +149,13 @@ async function dispatchSlashCommand(text) {
   return mode;
 }
 
-function socketPathFor(cwd) {
-  const slug = String(cwd || "default")
-    .replace(/[^a-zA-Z0-9]+/g, "-")
+function socketPathForSession(sessionId) {
+  const slug = String(sessionId ?? "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(-80);
-  return `/tmp/paseo-pi-bridge-${slug}.sock`;
+    .slice(-96);
+  if (!slug) throw new Error("Paseo bridge requires Pi session id");
+  return `/tmp/paseo-pi-bridge-session-${slug}.sock`;
 }
 
 function jsonReplacer(_key, value) {
@@ -275,7 +276,7 @@ export default function paseoPiBridge(pi) {
     }
   };
 
-  const sockPath = socketPathFor(state.cwd);
+  let sockPath = null;
 
   const server = createServer((sock) => {
     clients.add(sock);
@@ -326,9 +327,9 @@ export default function paseoPiBridge(pi) {
     setBridgeStatus(`Paseo bridge error: ${e?.code ?? e?.message ?? "unknown"}`);
   });
 
-  const socketHasLiveOwner = () =>
+  const socketHasLiveOwner = (path) =>
     new Promise((resolve) => {
-      const probe = createConnection(sockPath);
+      const probe = createConnection(path);
       let settled = false;
       const finish = (live) => {
         if (settled) return;
@@ -341,19 +342,66 @@ export default function paseoPiBridge(pi) {
       probe.setTimeout(500, () => finish(false));
     });
 
+  const unlinkOwnedSocket = (path) => {
+    if (!path) return;
+    try {
+      if (existsSync(path)) unlinkSync(path);
+    } catch (error) {
+      log("owned socket unlink failed:", path, error?.message);
+    }
+  };
+
+  let closePromise = Promise.resolve();
+  const closeBridge = () => {
+    listening = false;
+    for (const client of clients) {
+      try { client.destroy(); } catch { /* ignore */ }
+    }
+    clients.clear();
+    const closingPath = sockPath;
+    sockPath = null;
+    closePromise = closePromise.then(
+      () =>
+        new Promise((resolve) => {
+          const finish = () => {
+            unlinkOwnedSocket(closingPath);
+            resolve();
+          };
+          if (!server.listening) {
+            finish();
+            return;
+          }
+          try {
+            server.close(finish);
+          } catch {
+            finish();
+          }
+        }),
+    );
+    return closePromise;
+  };
+
+  let predecessorClose = Promise.resolve();
   const listen = async () => {
-    if (existsSync(sockPath)) {
-      if (await socketHasLiveOwner()) {
-        log("socket already owned by live Pi process:", sockPath);
-        setBridgeStatus("Paseo bridge: another Pi owns cwd socket");
+    await predecessorClose;
+    await closePromise;
+    if (!state.sessionId) return;
+    const targetPath = socketPathForSession(state.sessionId);
+    if (listening && sockPath === targetPath) return;
+    if (server.listening) await closeBridge();
+    if (existsSync(targetPath)) {
+      if (await socketHasLiveOwner(targetPath)) {
+        log("session socket already owned by live Pi process:", targetPath);
+        setBridgeStatus("Paseo bridge: duplicate Pi session already live");
         return;
       }
-      log("removing stale sock:", sockPath);
-      try { unlinkSync(sockPath); } catch (e) { log("unlink failed:", e?.message); }
+      log("removing stale session socket:", targetPath);
+      try { unlinkSync(targetPath); } catch (e) { log("unlink failed:", e?.message); }
     }
-    server.listen(sockPath, () => {
+    sockPath = targetPath;
+    server.listen(targetPath, () => {
       listening = true;
-      log("listening:", sockPath);
+      log("listening:", targetPath);
       setBridgeStatus("Paseo bridge: idle");
     });
   };
@@ -369,28 +417,28 @@ export default function paseoPiBridge(pi) {
   heartbeatTimer.unref?.();
 
   const previous = globalThis[registryKey];
-  globalThis[registryKey] = { server, clients, heartbeatTimer };
-  if (previous?.server) {
+  if (previous?.close) {
     log("replacing bridge from previous extension load");
+    predecessorClose = previous.close();
+  } else if (previous?.server) {
     clearInterval(previous.heartbeatTimer);
     for (const client of previous.clients ?? []) client.destroy();
-    try {
-      previous.server.close(listen);
-    } catch {
-      listen();
-    }
-  } else {
-    listen();
+    predecessorClose = new Promise((resolve) => {
+      try { previous.server.close(resolve); } catch { resolve(); }
+    });
   }
+  const disposeBridge = () => {
+    clearInterval(heartbeatTimer);
+    return closeBridge();
+  };
+  globalThis[registryKey] = { server, clients, heartbeatTimer, close: disposeBridge };
 
   process.on("exit", () => {
     clearInterval(heartbeatTimer);
     log("exit, closing server");
-    try {
-      server.close();
-    } catch {
-      // ignore
-    }
+    for (const client of clients) client.destroy();
+    try { server.close(); } catch { /* ignore */ }
+    unlinkOwnedSocket(sockPath);
   });
 
   pi.on("session_start", async (event, ctx) => {
@@ -409,6 +457,7 @@ export default function paseoPiBridge(pi) {
       state.sessionName = sm.getSessionName?.() ?? sm.sessionName ?? null;
       log("session_start:", state.sessionId, state.sessionFile);
     }
+    await listen();
     sendState();
     broadcast({ dir: "out", type: "event", event: { type: "session_start", data: event } });
   });
@@ -449,15 +498,7 @@ export default function paseoPiBridge(pi) {
     log("session_shutdown");
     broadcast({ dir: "out", type: "event", event: { type: "session_shutdown" } });
     setBridgeStatus(undefined);
-    for (const client of clients) {
-      try { client.destroy(); } catch { /* ignore */ }
-    }
-    clients.clear();
-    try {
-      server.close();
-    } catch {
-      // ignore
-    }
+    await closeBridge();
   });
 
   log("hooks registered");

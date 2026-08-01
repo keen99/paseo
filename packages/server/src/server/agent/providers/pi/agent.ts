@@ -66,8 +66,8 @@ import { revertPiConversation } from "./rewind.js";
 import { listPiImportableSessions, readPiImportSessionConfig } from "./session-descriptor.js";
 import {
   PiBridgeAttachSession,
-  bridgeSocketPathForCwd,
   bridgeSocketExists,
+  discoverLivePiBridges,
 } from "./bridge-attach.js";
 import type { PiRuntime, PiRuntimeSession, PiStartSessionInput } from "./runtime.js";
 import type {
@@ -2471,7 +2471,12 @@ export class PiRpcAgentClient implements AgentClient {
     const persistenceMetadata = parsePersistenceMetadata(handle.metadata);
     const resumeConfig = buildResumeConfig(persistenceMetadata, overrides, this.provider);
 
-    if (await bridgeSocketExists(resumeConfig.cwd)) {
+    if (
+      await bridgeSocketExists(resumeConfig.cwd, {
+        expectedSessionFile: sessionFile,
+        expectedSessionId: handle.sessionId,
+      })
+    ) {
       try {
         return await this.attachToLiveSession({
           cwd: resumeConfig.cwd,
@@ -2576,14 +2581,22 @@ export class PiRpcAgentClient implements AgentClient {
     expectedSessionFile?: string;
     expectedSessionId?: string;
   }): Promise<AgentSession> {
-    const socketPath = bridgeSocketPathForCwd(input.cwd);
-    const exists = await bridgeSocketExists(input.cwd);
-    if (!exists) {
+    const matches = await discoverLivePiBridges({
+      cwd: input.cwd,
+      expectedSessionFile: input.expectedSessionFile,
+      expectedSessionId: input.expectedSessionId,
+    });
+    if (matches.length === 0) {
       throw new Error(
-        `No live pi bridge socket at ${socketPath}. Start pi with the paseo bridge extension.`,
+        `No live Pi bridge matches session ${input.expectedSessionId ?? input.expectedSessionFile ?? "unknown"}. Start or reload that Pi session with the Paseo bridge extension.`,
       );
     }
-    const attach = new PiBridgeAttachSession(socketPath, {
+    if (matches.length > 1) {
+      throw new Error(
+        `Multiple live Pi bridges match session ${input.expectedSessionId ?? input.expectedSessionFile ?? "unknown"}`,
+      );
+    }
+    const attach = new PiBridgeAttachSession(matches[0].socketPath, {
       expectedSessionFile: input.expectedSessionFile,
       expectedSessionId: input.expectedSessionId,
     });

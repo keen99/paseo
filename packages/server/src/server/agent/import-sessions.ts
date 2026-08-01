@@ -20,16 +20,16 @@ import type {
 } from "@getpaseo/protocol/messages";
 import { getParentAgentIdFromLabels, PARENT_AGENT_ID_LABEL } from "@getpaseo/protocol/agent-labels";
 import { createRealpathAwarePathMatcher } from "../../utils/path.js";
-import { bridgeSocketExists } from "./providers/pi/bridge-attach.js";
+import { resolve as resolvePath } from "node:path";
+import { discoverLivePiBridges } from "./providers/pi/bridge-attach.js";
 
-async function probeLiveAttachableCwds(cwds: string[]): Promise<Set<string>> {
-  const live = new Set<string>();
-  await Promise.all(
-    cwds.map(async (cwd) => {
-      if (await bridgeSocketExists(cwd)) live.add(cwd);
-    }),
+async function probeLivePiSessionFiles(): Promise<Set<string>> {
+  return new Set(
+    (await discoverLivePiBridges())
+      .map((bridge) => bridge.sessionFile)
+      .filter((sessionFile): sessionFile is string => sessionFile !== null)
+      .map((sessionFile) => resolvePath(sessionFile)),
   );
-  return live;
 }
 
 type ImportAgentRequestMessage = z.infer<typeof ImportAgentRequestMessageSchema>;
@@ -168,12 +168,13 @@ export async function listImportableProviderSessions(
 
   const ranked = candidates.sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime());
   const top = ranked.slice(0, limit);
-  const cwdsToProbe = [...new Set(top.map((d) => d.cwd))];
-  const liveCwds = await probeLiveAttachableCwds(cwdsToProbe);
+  const livePiSessionFiles = await probeLivePiSessionFiles();
   const entries = top.map((descriptor) =>
     toRecentProviderSessionDescriptorPayload(descriptor, {
       providerLabel: providerSnapshotManager.getProviderLabel(descriptor.provider),
-      isLiveAttachable: liveCwds.has(descriptor.cwd),
+      isLiveAttachable:
+        descriptor.provider === "pi" &&
+        livePiSessionFiles.has(resolvePath(descriptor.providerHandleId)),
     }),
   );
 
