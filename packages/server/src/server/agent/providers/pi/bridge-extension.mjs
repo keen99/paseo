@@ -332,10 +332,21 @@ export default function paseoPiBridge(pi) {
     });
   };
 
+  const heartbeatTimer = setInterval(() => {
+    if (clients.size === 0) return;
+    broadcast({
+      dir: "out",
+      type: "event",
+      event: { type: "live_heartbeat", data: { at: new Date().toISOString() } },
+    });
+  }, 2_000);
+  heartbeatTimer.unref?.();
+
   const previous = globalThis[registryKey];
-  globalThis[registryKey] = { server, clients };
+  globalThis[registryKey] = { server, clients, heartbeatTimer };
   if (previous?.server) {
     log("replacing bridge from previous extension load");
+    clearInterval(previous.heartbeatTimer);
     for (const client of previous.clients ?? []) client.destroy();
     try {
       previous.server.close(listen);
@@ -347,6 +358,7 @@ export default function paseoPiBridge(pi) {
   }
 
   process.on("exit", () => {
+    clearInterval(heartbeatTimer);
     log("exit, closing server");
     try {
       server.close();

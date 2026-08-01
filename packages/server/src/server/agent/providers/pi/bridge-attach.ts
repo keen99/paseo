@@ -6,6 +6,7 @@
  */
 import { connect, type Socket } from "node:net";
 import { stat } from "node:fs/promises";
+import { resolve as resolvePath } from "node:path";
 import type {
   PiAgentMessage,
   PiModel,
@@ -25,6 +26,7 @@ export interface BridgeHello {
 }
 
 const CONNECT_TIMEOUT_MS = 5_000;
+const HEARTBEAT_STALE_MS = 7_000;
 
 /** Build the bridge socket path for a cwd (mirrors bridge-extension socketPathFor). */
 export function bridgeSocketPathForCwd(cwd: string): string {
@@ -76,10 +78,25 @@ export class PiBridgeAttachSession {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private intentionallyClosed = false;
   private connectedOnce = false;
+  private lastHeartbeatAt = 0;
+  private readonly watchdogTimer: NodeJS.Timeout;
 
-  constructor(socketPath: string) {
+  constructor(
+    socketPath: string,
+    private readonly expected: { expectedSessionFile?: string; expectedSessionId?: string } = {},
+  ) {
     this.socketPath = socketPath;
     this.readyPromise = this.open();
+    this.watchdogTimer = setInterval(() => {
+      if (
+        this.helloReceived &&
+        this.lastHeartbeatAt > 0 &&
+        Date.now() - this.lastHeartbeatAt > HEARTBEAT_STALE_MS
+      ) {
+        this.sock?.destroy(new Error("bridge heartbeat stale"));
+      }
+    }, 2_000);
+    this.watchdogTimer.unref?.();
   }
 
   private open(): Promise<BridgeHello> {
@@ -162,8 +179,22 @@ export class PiBridgeAttachSession {
     };
     if (!isHello) return;
 
+    const sessionFileMatches =
+      this.expected.expectedSessionFile === undefined ||
+      (this.latestState.sessionFile !== null &&
+        resolvePath(this.latestState.sessionFile) ===
+          resolvePath(this.expected.expectedSessionFile));
+    const sessionIdMatches =
+      this.expected.expectedSessionId === undefined ||
+      this.latestState.sessionId === this.expected.expectedSessionId;
+    if (!sessionFileMatches || !sessionIdMatches) {
+      this.sock?.destroy(new Error("bridge session mismatch during reconnect"));
+      return;
+    }
+
     const reconnect = this.connectedOnce;
     this.helloReceived = true;
+    this.lastHeartbeatAt = Date.now();
     this.connectedOnce = true;
     if (this.helloResolve) {
       this.helloResolve(this.latestState);
@@ -187,6 +218,7 @@ export class PiBridgeAttachSession {
     if (type === "event") {
       const raw = msg.event as { type?: string; data?: object } | undefined;
       if (raw && typeof raw.type === "string") {
+        if (raw.type === "live_heartbeat") this.lastHeartbeatAt = Date.now();
         const event = { type: raw.type, ...raw.data } as PiRuntimeEvent;
         for (const sub of this.subscribers) sub(event);
       }
@@ -330,6 +362,7 @@ export class PiBridgeAttachSession {
 
   async close(): Promise<void> {
     this.intentionallyClosed = true;
+    clearInterval(this.watchdogTimer);
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;

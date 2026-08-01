@@ -437,6 +437,11 @@ export type AgentStreamEvent =
       type: "live_state_changed";
       provider: AgentProvider;
       liveState: "connected" | "disconnected" | "none";
+    }
+  | {
+      type: "live_heartbeat";
+      provider: AgentProvider;
+      at: string;
     };
 
 export function getAgentStreamEventTurnId(event: AgentStreamEvent): string | undefined {

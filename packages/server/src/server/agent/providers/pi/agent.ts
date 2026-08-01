@@ -2049,6 +2049,14 @@ export class PiRpcAgentSession implements AgentSession {
       }
       return;
     }
+    if (event.type === "live_heartbeat") {
+      this.emit({
+        type: "live_heartbeat",
+        provider: this.provider,
+        at: optionalString(event.at) ?? new Date().toISOString(),
+      });
+      return;
+    }
     if (event.type === "live_disconnected" || event.type === "live_connected") {
       this.liveConnected = event.type === "live_connected";
       this.emit({
@@ -2574,7 +2582,10 @@ export class PiRpcAgentClient implements AgentClient {
         `No live pi bridge socket at ${socketPath}. Start pi with the paseo bridge extension.`,
       );
     }
-    const attach = new PiBridgeAttachSession(socketPath);
+    const attach = new PiBridgeAttachSession(socketPath, {
+      expectedSessionFile: input.expectedSessionFile,
+      expectedSessionId: input.expectedSessionId,
+    });
     try {
       const hello = await attach.ready();
       const sessionFileMatches =

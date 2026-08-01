@@ -119,6 +119,8 @@ interface ControlledAgentControlsProps {
   liveState?: "connected" | "disconnected" | "none";
   tailState: PiTailHealth;
   transportConnected: boolean;
+  lastHeartbeatAt: number | null;
+  heartbeatAgeMs: number | null;
 }
 
 export interface DraftAgentControlsProps {
@@ -436,6 +438,8 @@ function ControlledAgentControls({
   liveState = "none",
   tailState,
   transportConnected,
+  lastHeartbeatAt,
+  heartbeatAgeMs,
   modeControl,
   modelSelectorServerId = null,
   isCompactLayout,
@@ -701,6 +705,8 @@ function ControlledAgentControls({
             liveState={liveState}
             tailState={tailState}
             transportConnected={transportConnected}
+            lastHeartbeatAt={lastHeartbeatAt}
+            heartbeatAgeMs={heartbeatAgeMs}
             displayThinking={displayThinking}
             openSelector={openSelector}
             providerAnchorRef={providerAnchorRef}
@@ -793,6 +799,8 @@ interface DesktopAgentControlsContentProps {
   liveState: "connected" | "disconnected" | "none";
   tailState: PiTailHealth;
   transportConnected: boolean;
+  lastHeartbeatAt: number | null;
+  heartbeatAgeMs: number | null;
   displayThinking: string;
   openSelector: AgentControlSelector | null;
   providerAnchorRef: RefObject<View | null>;
@@ -829,13 +837,24 @@ interface PiLiveStatusProps {
   bridge: "connected" | "disconnected" | "none";
   tail: PiTailHealth;
   transportConnected: boolean;
+  lastHeartbeatAt: number | null;
+  heartbeatAgeMs: number | null;
   visible: boolean;
   onOpen: () => void;
   onClose: () => void;
 }
 
 function PiLiveStatus(props: PiLiveStatusProps) {
-  const { bridge, tail, transportConnected, visible, onOpen, onClose } = props;
+  const {
+    bridge,
+    tail,
+    transportConnected,
+    lastHeartbeatAt,
+    heartbeatAgeMs,
+    visible,
+    onOpen,
+    onClose,
+  } = props;
   const isLive = bridge === "connected" && tail === "connected" && transportConnected;
   return (
     <>
@@ -859,14 +878,22 @@ function PiLiveStatus(props: PiLiveStatusProps) {
       >
         <View style={styles.liveDiagnostics}>
           <Text style={styles.liveDiagnosticsLine}>
-            Browser transport: {transportConnected ? "CONNECTED" : "DISCONNECTED"}
+            Browser ↔ Paseo backend: {transportConnected ? "CONNECTED" : "DISCONNECTED"}
           </Text>
           <Text style={styles.liveDiagnosticsLine}>
-            Bridge: {bridge === "connected" ? "CONNECTED" : "DISCONNECTED"}
+            Paseo backend ↔ Pi: {bridge === "connected" ? "CONNECTED" : "DISCONNECTED"}
           </Text>
-          <Text style={styles.liveDiagnosticsLine}>Tail: {tail.toUpperCase()}</Text>
+          <Text style={styles.liveDiagnosticsLine}>
+            Backend → browser event stream: {tail.toUpperCase()}
+          </Text>
+          <Text style={styles.liveDiagnosticsLine}>
+            Last end-to-end heartbeat:{" "}
+            {lastHeartbeatAt === null
+              ? "NEVER"
+              : `${Math.round((heartbeatAgeMs ?? 0) / 1000)}s ago`}
+          </Text>
           <Text style={styles.liveDiagnosticsHelp}>
-            LIVE requires browser transport, Pi bridge, and timeline tail all connected.
+            LIVE requires full proxied path: Pi ↔ Paseo backend ↔ browser.
           </Text>
         </View>
       </AdaptiveModalSheet>
@@ -904,6 +931,8 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
     liveState,
     tailState,
     transportConnected,
+    lastHeartbeatAt,
+    heartbeatAgeMs,
     displayProvider,
     displayThinking,
     openSelector,
@@ -972,6 +1001,8 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
           bridge={liveState}
           tail={tailState}
           transportConnected={transportConnected}
+          lastHeartbeatAt={lastHeartbeatAt}
+          heartbeatAgeMs={heartbeatAgeMs}
           visible={activeSheet === "live"}
           onOpen={handleOpenLive}
           onClose={handleCloseSheet}
@@ -1737,6 +1768,8 @@ export const AgentControls = memo(function AgentControls({
       liveState={piLiveHealth.bridge}
       tailState={piLiveHealth.tail}
       transportConnected={piLiveHealth.transportConnected}
+      lastHeartbeatAt={piLiveHealth.lastHeartbeatAt}
+      heartbeatAgeMs={piLiveHealth.heartbeatAgeMs}
       modeControl={modeControl}
       modelSelectorServerId={serverId}
       isCompactLayout={isCompactLayout}
@@ -1844,6 +1877,8 @@ export function DraftAgentControls({
       disabled={disabled}
       tailState="disconnected"
       transportConnected={false}
+      lastHeartbeatAt={null}
+      heartbeatAgeMs={null}
       modeControl={modeControl}
       modelSelectorServerId={modelSelectorServerId}
       isCompactLayout={isCompactLayout}

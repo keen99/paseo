@@ -647,6 +647,11 @@ export const AgentStreamEventPayloadSchema = z.discriminatedUnion("type", [
     resolution: AgentPermissionResponseSchema,
   }),
   z.object({
+    type: z.literal("live_heartbeat"),
+    provider: AgentProviderSchema,
+    at: z.string(),
+  }),
+  z.object({
     type: z.literal("attention_required"),
     provider: AgentProviderSchema,
     reason: z.enum(["finished", "error", "permission"]),

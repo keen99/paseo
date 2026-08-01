@@ -200,6 +200,10 @@ export type PiRuntimeEvent =
       text?: string;
     }
   | {
+      type: "live_heartbeat";
+      at?: string;
+    }
+  | {
       type: "process_exit";
       error: string;
     }

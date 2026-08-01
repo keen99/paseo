@@ -397,6 +397,11 @@ export type AgentStreamEvent =
       provider: AgentProvider;
       reason: "finished" | "error" | "permission";
       timestamp: string;
+    }
+  | {
+      type: "live_heartbeat";
+      provider: AgentProvider;
+      at: string;
     };
 
 export function getAgentStreamEventTurnId(event: AgentStreamEvent): string | undefined {
