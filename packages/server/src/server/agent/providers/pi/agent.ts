@@ -1998,14 +1998,11 @@ export class PiRpcAgentSession implements AgentSession {
   }
 
   private handleCommandOutput(textValue: unknown): void {
-    if (!this.activeTurnId) {
-      return;
-    }
     const text = stripAnsi(optionalString(textValue) ?? "").trim();
     if (!text) {
       return;
     }
-    if (!this.activeTurnStarted) {
+    if (this.activeTurnId && !this.activeTurnStarted) {
       this.bufferNoTurnOutput(text);
       return;
     }
