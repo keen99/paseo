@@ -2408,10 +2408,25 @@ export class PiRpcAgentClient implements AgentClient {
     this.runtime = options.runtime ?? createRuntime(options.logger, options.runtimeSettings);
   }
 
+  private async assertNoLivePiForCwd(cwd: string, context: string): Promise<void> {
+    const live = await discoverLivePiBridges({ cwd });
+    if (live.length > 0) {
+      this.logger.error(
+        { cwd, count: live.length, sessions: live.map((b) => b.sessionId), context },
+        "pi.create.spawn_refused_live_exists",
+      );
+      throw new Error(
+        `Refusing to spawn Pi (${context}): ${live.length} live Pi bridge(s) already exist for cwd ${cwd}. Attach instead.`,
+      );
+    }
+    this.logger.info({ cwd, context }, "pi.create.spawn_allowed_no_live");
+  }
+
   async createSession(
     config: AgentSessionConfig,
     launchContext?: AgentLaunchContext,
   ): Promise<AgentSession> {
+    await this.assertNoLivePiForCwd(config.cwd, "createSession");
     const mcpEnv = {
       ...this.runtimeSettings?.env,
       ...launchContext?.env,
@@ -2501,6 +2516,7 @@ export class PiRpcAgentClient implements AgentClient {
       resumeConfig.config.mcpServers,
       mcpEnv,
     );
+    await this.assertNoLivePiForCwd(resumeConfig.cwd, "resumeSession");
     const paseoExtension = createPiPaseoExtensionFile(
       composeSystemPromptParts(
         resumeConfig.config.systemPrompt,
