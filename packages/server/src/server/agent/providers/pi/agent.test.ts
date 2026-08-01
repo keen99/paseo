@@ -1080,7 +1080,14 @@ describe("PiRpcAgentSession", () => {
     expect(usageCompletion).toMatchObject({ type: "turn_completed", turnId: usageTurnId });
     expect(events.timelineAndCompletionEvents()).toEqual([
       { type: "timeline", item: { type: "user_message", text: "/usage" } },
-      { type: "timeline", item: { type: "assistant_message", text: "Usage 12%" } },
+      {
+        type: "timeline",
+        item: {
+          type: "assistant_message",
+          text: "Usage 12%",
+          messageId: `pi-command-${usageTurnId}-0`,
+        },
+      },
       { type: "turn_completed" },
     ]);
 
@@ -1107,7 +1114,14 @@ describe("PiRpcAgentSession", () => {
     expect(await events.nextTurnCompletion()).toMatchObject({ type: "turn_completed", turnId });
     expect(events.timelineAndCompletionEvents()).toEqual([
       { type: "timeline", item: { type: "user_message", text: "/usage" } },
-      { type: "timeline", item: { type: "assistant_message", text: "Usage 12%" } },
+      {
+        type: "timeline",
+        item: {
+          type: "assistant_message",
+          text: "Usage 12%",
+          messageId: `pi-command-${turnId}-0`,
+        },
+      },
       { type: "turn_completed" },
     ]);
   });
@@ -1147,7 +1161,14 @@ describe("PiRpcAgentSession", () => {
     expect(completion).toMatchObject({ type: "turn_completed", turnId });
     expect(events.timelineAndCompletionEvents()).toEqual([
       { type: "timeline", item: { type: "user_message", text: "/plan on" } },
-      { type: "timeline", item: { type: "assistant_message", text: "Plan mode enabled" } },
+      {
+        type: "timeline",
+        item: {
+          type: "assistant_message",
+          text: "Plan mode enabled",
+          messageId: `pi-command-${turnId}-0`,
+        },
+      },
       { type: "turn_completed" },
     ]);
   });

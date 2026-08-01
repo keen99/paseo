@@ -1681,7 +1681,7 @@ export class PiRpcAgentSession implements AgentSession {
         },
       });
     }
-    for (const output of outputs) {
+    for (const [index, output] of outputs.entries()) {
       this.emit({
         type: "timeline",
         provider: this.provider,
@@ -1689,6 +1689,7 @@ export class PiRpcAgentSession implements AgentSession {
         item: {
           type: "assistant_message",
           text: output.message,
+          messageId: `pi-command-${turnId}-${index}`,
         },
       });
     }
@@ -2010,7 +2011,7 @@ export class PiRpcAgentSession implements AgentSession {
       type: "timeline",
       provider: this.provider,
       turnId: this.currentTurnIdForEvent(),
-      item: { type: "assistant_message", text },
+      item: { type: "assistant_message", text, messageId: `pi-command-${randomUUID()}` },
     });
   }
 
