@@ -2160,6 +2160,9 @@ export class PiRpcAgentSession implements AgentSession {
         });
         return;
       case "agent_end":
+        if (turnId && this.pendingNoTurnOutputs.some((output) => output.turnId === turnId)) {
+          this.emitBufferedNoTurnOutputs(turnId);
+        }
         this.completeTurn(turnId, event.messages ?? []);
         return;
       default:

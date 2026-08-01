@@ -1094,6 +1094,24 @@ describe("PiRpcAgentSession", () => {
     });
   });
 
+  test("flushes slash command output before synthetic agent_end", async () => {
+    const { pi, session, events } = await createSession();
+    const fakeSession = pi.latestSession();
+    fakeSession.promptAck = { agentInvoked: true };
+
+    const { turnId } = await session.startTurn("/usage");
+    fakeSession.emit({ type: "command_output", text: "Usage 12%" });
+    fakeSession.emit({ type: "agent_end", messages: [] });
+    await flushTurnScheduling();
+
+    expect(await events.nextTurnCompletion()).toMatchObject({ type: "turn_completed", turnId });
+    expect(events.timelineAndCompletionEvents()).toEqual([
+      { type: "timeline", item: { type: "user_message", text: "/usage" } },
+      { type: "timeline", item: { type: "assistant_message", text: "Usage 12%" } },
+      { type: "turn_completed" },
+    ]);
+  });
+
   test("does not synthesize completion when agentInvoked is true for slash prompts", async () => {
     const { pi, session, events } = await createSession();
     const fakeSession = pi.latestSession();
