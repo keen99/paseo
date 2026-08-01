@@ -7,17 +7,25 @@ import {
   openSync,
   readSync,
   rmSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
+import { createServer, type Server, type Socket } from "node:net";
 import path from "node:path";
 import pino from "pino";
 import { setImmediate as waitForImmediate } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
-import { describe, expect, onTestFinished, test } from "vitest";
+import { describe, expect, onTestFinished, test, vi } from "vitest";
 
 import type { AgentSession, AgentSessionConfig, AgentStreamEvent } from "../../agent-sdk-types.js";
 import { PiRpcAgentClient, PiRpcAgentSession, transformPiModels } from "./agent.js";
+import {
+  bridgeSocketPathForSession,
+  type BridgeHello,
+  type DiscoveredPiBridge,
+} from "./bridge-attach.js";
+import * as bridgeAttachModule from "./bridge-attach.js";
 import { FakePi } from "./test-utils/fake-pi.js";
 
 const ONE_BY_ONE_PNG_BASE64 =
@@ -87,6 +95,101 @@ async function applyPaseoExtensionSystemPrompt(
 
 async function flushTurnScheduling(): Promise<void> {
   await waitForImmediate();
+}
+
+interface FakeBridge {
+  path: string;
+  server: Server;
+  sockets: Set<Socket>;
+  close(): Promise<void>;
+}
+
+async function startFakeBridge(state: BridgeHello): Promise<FakeBridge> {
+  if (!state.sessionId) throw new Error("fake bridge requires session id");
+  const bridgePath = bridgeSocketPathForSession(state.sessionId);
+  try {
+    unlinkSync(bridgePath);
+  } catch {
+    // ignore missing socket
+  }
+  const sockets = new Set<Socket>();
+  const server = createServer((socket) => {
+    sockets.add(socket);
+    socket.setEncoding("utf8");
+    socket.write(`${JSON.stringify({ dir: "out", type: "hello", state })}\n`);
+    let buffer = "";
+    socket.on("data", (chunk: string) => {
+      buffer += chunk;
+      let newline: number;
+      while ((newline = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, newline);
+        buffer = buffer.slice(newline + 1);
+        if (!line) continue;
+        const message = JSON.parse(line) as Record<string, unknown>;
+        if (message.type === "get_messages") {
+          socket.write(`${JSON.stringify({ dir: "out", type: "messages", messages: [] })}\n`);
+        }
+      }
+    });
+    socket.on("close", () => sockets.delete(socket));
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(bridgePath, resolve);
+  });
+  let closed = false;
+  const close = async () => {
+    if (closed) return;
+    closed = true;
+    for (const socket of sockets) socket.destroy();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    try {
+      unlinkSync(bridgePath);
+    } catch {
+      // ignore
+    }
+  };
+  return { path: bridgePath, server, sockets, close };
+}
+
+async function stubLiveBridge(
+  state: BridgeHello,
+  overrides?: {
+    expectedSessionId?: string;
+    expectedSessionFile?: string;
+    cwd?: string;
+  },
+): Promise<{ bridge: FakeBridge; restore: () => void }> {
+  const socketPath = bridgeSocketPathForSession(state.sessionId!);
+  const fakeBridge: DiscoveredPiBridge = {
+    socketPath,
+    sessionFile: state.sessionFile,
+    sessionId: state.sessionId,
+    sessionName: state.sessionName,
+    cwd: state.cwd,
+    isStreaming: state.isStreaming,
+  };
+  const spy = vi
+    .spyOn(bridgeAttachModule, "discoverLivePiBridges")
+    .mockImplementation(async (expected = {}) => {
+      const cwdMatch = !expected.cwd || resolvePath(fakeBridge.cwd) === resolvePath(expected.cwd);
+      const fileMatch =
+        !expected.expectedSessionFile ||
+        (fakeBridge.sessionFile !== null &&
+          resolvePath(fakeBridge.sessionFile) === resolvePath(expected.expectedSessionFile));
+      const idMatch =
+        !expected.expectedSessionId || fakeBridge.sessionId === expected.expectedSessionId;
+      return cwdMatch && fileMatch && idMatch ? [fakeBridge] : [];
+    });
+  void overrides;
+  return {
+    bridge: await startFakeBridge(state),
+    restore: () => spy.mockRestore(),
+  };
+}
+
+function resolvePath(candidate: string): string {
+  return path.resolve(candidate);
 }
 
 async function createSession(pi = new FakePi()): Promise<{
@@ -624,6 +727,17 @@ describe("PiRpcAgentSession", () => {
   test("uses the Pi entry attached to a submitted prompt after resuming old history", async () => {
     const pi = new FakePi();
     const client = createClient(pi);
+    const { bridge, restore } = await stubLiveBridge({
+      sessionId: "pi-session-1",
+      sessionFile: "/tmp/native-pi-session",
+      sessionName: "resumed",
+      cwd: "/workspace/project",
+      isStreaming: false,
+    });
+    onTestFinished(async () => {
+      restore();
+      await bridge.close();
+    });
     const session = (await client.resumeSession({
       provider: "pi",
       sessionId: "pi-session-1",
@@ -631,15 +745,35 @@ describe("PiRpcAgentSession", () => {
       metadata: { cwd: "/workspace/project" },
     })) as PiRpcAgentSession;
     const events = new SessionEvents(session);
-    const fakeSession = pi.latestSession();
-    fakeSession.capturedUserEntries = [{ id: "entry-old", parentId: null, text: "old prompt" }];
 
     await session.startTurn("new prompt", { clientMessageId: "client-new" });
-    fakeSession.finishSubmittedUserMessage({
-      id: "entry-new",
-      parentId: "entry-old-assistant",
-      text: "new prompt",
-    });
+    for (const socket of bridge.sockets) {
+      socket.write(
+        `${JSON.stringify({
+          dir: "out",
+          type: "event",
+          event: {
+            type: "message_end",
+            data: { message: { role: "user", content: "new prompt" } },
+          },
+        })}\n`,
+      );
+      socket.write(
+        `${JSON.stringify({
+          dir: "out",
+          type: "event",
+          event: {
+            type: "extension_ui_request",
+            data: {
+              id: `submitted-user-entry-new`,
+              method: "notify",
+              message:
+                'PASEO_SUBMITTED_USER_ENTRY {"entry":{"id":"entry-new","parentId":"entry-old-assistant","text":"new prompt"}}',
+            },
+          },
+        })}\n`,
+      );
+    }
 
     await events.nextTimelineEvent();
 
@@ -651,6 +785,8 @@ describe("PiRpcAgentSession", () => {
         clientMessageId: "client-new",
       },
     ]);
+
+    await session.close();
   });
 
   test("surfaces Pi extension command messages and completes when no agent turn starts", async () => {
@@ -789,11 +925,22 @@ describe("PiRpcAgentSession", () => {
     });
   });
 
-  test("resumes by launching Pi with the persisted session file and cwd metadata", async () => {
+  test("resumes by attaching the live Pi bridge matching the persisted session file and cwd metadata", async () => {
     const pi = new FakePi();
     const client = createClient(pi);
+    const { bridge, restore } = await stubLiveBridge({
+      sessionId: "pi-session-1",
+      sessionFile: "/tmp/native-pi-session",
+      sessionName: "resumed",
+      cwd: "/workspace/project",
+      isStreaming: false,
+    });
+    onTestFinished(async () => {
+      restore();
+      await bridge.close();
+    });
 
-    await client.resumeSession(
+    const session = (await client.resumeSession(
       {
         provider: "pi",
         sessionId: "pi-session-1",
@@ -806,29 +953,20 @@ describe("PiRpcAgentSession", () => {
       },
       {},
       { env: { RESUME_PROBE: "expected" } },
-    );
+    )) as PiRpcAgentSession;
 
-    expect(pi.recordedLaunches).toHaveLength(1);
-    const actualLaunch = pi.recordedLaunches[0]!;
-    expect(actualLaunch).toMatchObject({
+    // resumeSession is attach-only: it must never spawn a fresh Pi process.
+    expect(pi.recordedLaunches).toHaveLength(0);
+    // The persisted cwd + session file drive bridge selection; the resumed
+    // config carries the persisted model + thinking level forward.
+    expect(session.config).toMatchObject({
+      provider: "pi",
       cwd: "/workspace/project",
-      env: { RESUME_PROBE: "expected" },
-      session: "/tmp/native-pi-session",
+      model: "openrouter/model-a",
+      thinkingOptionId: "high",
     });
-    expect(actualLaunch.extensionPaths).toHaveLength(1);
-    expect(actualLaunch.argv).toEqual([
-      "pi",
-      "--mode",
-      "rpc",
-      "--model",
-      "openrouter/model-a",
-      "--thinking",
-      "high",
-      "--session",
-      "/tmp/native-pi-session",
-      "--extension",
-      actualLaunch.extensionPaths[0],
-    ]);
+
+    await session.close();
   });
 
   test("reports the persisted Pi entry attached to the submitted message", async () => {
@@ -910,11 +1048,22 @@ describe("PiRpcAgentSession", () => {
     await session.close();
   });
 
-  test("resumes Pi sessions with daemon system prompts appended", async () => {
+  test("resumes Pi sessions with persisted agent and daemon system prompts carried on config", async () => {
     const pi = new FakePi();
     const client = createClient(pi);
+    const { bridge, restore } = await stubLiveBridge({
+      sessionId: "pi-session-1",
+      sessionFile: "/tmp/native-pi-session",
+      sessionName: "resumed",
+      cwd: "/workspace/project",
+      isStreaming: false,
+    });
+    onTestFinished(async () => {
+      restore();
+      await bridge.close();
+    });
 
-    await client.resumeSession(
+    const session = (await client.resumeSession(
       {
         provider: "pi",
         sessionId: "pi-session-1",
@@ -929,31 +1078,21 @@ describe("PiRpcAgentSession", () => {
       {
         daemonAppendSystemPrompt: "Daemon prompt",
       },
-    );
+    )) as PiRpcAgentSession;
 
-    expect(pi.recordedLaunches).toHaveLength(1);
-    const actualLaunch = pi.recordedLaunches[0]!;
-    expect(actualLaunch).toMatchObject({
+    // resumeSession is attach-only: no spawn, no extension file.
+    expect(pi.recordedLaunches).toHaveLength(0);
+    // Both the persisted agent prompt and the resume-time daemon append are
+    // forwarded on the resumed config for downstream consumers.
+    expect(session.config).toMatchObject({
       cwd: "/workspace/project",
-      session: "/tmp/native-pi-session",
+      model: "openrouter/model-a",
+      thinkingOptionId: "high",
+      systemPrompt: "Agent prompt",
+      daemonAppendSystemPrompt: "Daemon prompt",
     });
-    expect(actualLaunch.extensionPaths).toHaveLength(1);
-    expect(actualLaunch.argv).toEqual([
-      "pi",
-      "--mode",
-      "rpc",
-      "--model",
-      "openrouter/model-a",
-      "--thinking",
-      "high",
-      "--session",
-      "/tmp/native-pi-session",
-      "--extension",
-      actualLaunch.extensionPaths[0],
-    ]);
-    await expect(
-      applyPaseoExtensionSystemPrompt(actualLaunch.extensionPaths[0]!, "Pi project prompt"),
-    ).resolves.toBe("Pi project prompt\n\nAgent prompt\n\nDaemon prompt");
+
+    await session.close();
   });
 
   test("updates model and thinking through Pi runtime commands", async () => {
@@ -1389,27 +1528,27 @@ describe("PiRpcAgentClient", () => {
       runtime: pi,
       providerParams: { sessionDir: sessionsDir },
     });
+    const { bridge, restore } = await stubLiveBridge({
+      sessionId: sessionFile,
+      sessionFile,
+      sessionName: "imported",
+      cwd,
+      isStreaming: false,
+    });
+    onTestFinished(async () => {
+      restore();
+      await bridge.close();
+    });
 
     const imported = await client.importSession(
       { providerHandleId: sessionFile, cwd },
       { config: createConfig({ cwd }), storedConfig: createConfig({ cwd }) },
     );
 
-    const actualLaunch = pi.recordedLaunches[0]!;
-    expect(actualLaunch.extensionPaths).toHaveLength(1);
-    expect(actualLaunch.argv).toEqual([
-      "pi",
-      "--mode",
-      "rpc",
-      "--model",
-      "openrouter/anthropic/claude-sonnet-4.5",
-      "--thinking",
-      "high",
-      "--session",
-      sessionFile,
-      "--extension",
-      actualLaunch.extensionPaths[0],
-    ]);
+    // importSession now drives resumeSession (attach-only): it must never spawn.
+    expect(pi.recordedLaunches).toHaveLength(0);
+    // The recorded model + thinking level from the JSONL session are carried
+    // forward on the imported config + persistence metadata.
     expect(imported.config).toMatchObject({
       provider: "pi",
       cwd,
@@ -1422,6 +1561,8 @@ describe("PiRpcAgentClient", () => {
       model: "openrouter/anthropic/claude-sonnet-4.5",
       thinkingOptionId: "high",
     });
+
+    await imported.session.close();
   });
 
   test("discovers models from a short-lived Pi session in the requested cwd", async () => {

@@ -65,7 +65,7 @@ import { PiCliRuntime } from "./cli-runtime.js";
 import { revertPiConversation } from "./rewind.js";
 import { listPiImportableSessions, readPiImportSessionConfig } from "./session-descriptor.js";
 import { PiBridgeAttachSession, discoverLivePiBridges } from "./bridge-attach.js";
-import type { PiRuntime, PiRuntimeSession, PiStartSessionInput } from "./runtime.js";
+import type { PiRuntime, PiRuntimeSession } from "./runtime.js";
 import type {
   PiAgentSessionEvent,
   PiAgentMessage,
@@ -516,24 +516,6 @@ function buildResumeConfig(
       modeId,
       systemPrompt: overrideConfig.systemPrompt ?? metadata.systemPrompt,
     },
-  };
-}
-
-function buildResumeStartInput(input: {
-  resumeConfig: PiResumeConfig;
-  sessionFile: string;
-  launchContext: AgentLaunchContext | undefined;
-  mcpConfig: PiMcpConfigFile | null;
-  paseoExtension: PiTempFile | null;
-}): PiStartSessionInput {
-  return {
-    cwd: input.resumeConfig.cwd,
-    env: input.launchContext?.env,
-    session: input.sessionFile,
-    model: input.resumeConfig.model,
-    thinkingOptionId: normalizePiThinkingOption(input.resumeConfig.thinkingOptionId) ?? undefined,
-    mcpConfigPath: input.mcpConfig?.path,
-    extensionPaths: input.paseoExtension ? [input.paseoExtension.path] : undefined,
   };
 }
 
@@ -2472,7 +2454,7 @@ export class PiRpcAgentClient implements AgentClient {
   async resumeSession(
     handle: AgentPersistenceHandle,
     overrides?: Partial<AgentSessionConfig>,
-    launchContext?: AgentLaunchContext,
+    _launchContext?: AgentLaunchContext,
   ): Promise<AgentSession> {
     const sessionFile = handle.nativeHandle;
     if (!sessionFile) {
@@ -2500,60 +2482,13 @@ export class PiRpcAgentClient implements AgentClient {
         `Multiple live Pi bridges match session ${handle.sessionId ?? sessionFile}; refusing to spawn. Quit the extra Pi processes and retry.`,
       );
     }
-    const liveCwdBridges = await discoverLivePiBridges({ cwd: resumeConfig.cwd });
-    if (liveCwdBridges.length > 0) {
-      throw new Error(
-        `Live Pi process exists in ${resumeConfig.cwd} but none matches session ${handle.sessionId ?? sessionFile}. Reload that Pi with the Paseo bridge extension, or attach to the matching session instead.`,
-      );
-    }
-
-    const mcpEnv = {
-      ...this.runtimeSettings?.env,
-      ...launchContext?.env,
-    };
-    const mcpConfig = await this.prepareMcpConfig(
-      resumeConfig.cwd,
-      resumeConfig.config.mcpServers,
-      mcpEnv,
+    this.logger.error(
+      { cwd: resumeConfig.cwd, sessionFile, sessionId: handle.sessionId },
+      "pi.resume.spawn_refused_no_live",
     );
-    await this.assertNoLivePiForCwd(resumeConfig.cwd, "resumeSession");
-    const paseoExtension = createPiPaseoExtensionFile(
-      composeSystemPromptParts(
-        resumeConfig.config.systemPrompt,
-        resumeConfig.config.daemonAppendSystemPrompt,
-      ),
+    throw new Error(
+      `No live Pi bridge found for session ${handle.sessionId ?? sessionFile} in ${resumeConfig.cwd}. Launch pi in that directory first, then reload the agent.`,
     );
-    let runtimeSession: PiRuntimeSession;
-    try {
-      runtimeSession = await this.runtime.startSession(
-        buildResumeStartInput({
-          resumeConfig,
-          sessionFile,
-          launchContext,
-          mcpConfig,
-          paseoExtension,
-        }),
-      );
-    } catch (error) {
-      mcpConfig?.cleanup();
-      paseoExtension?.cleanup();
-      throw error;
-    }
-    try {
-      return new PiRpcAgentSession({
-        runtimeSession,
-        config: resumeConfig.config,
-        initialState: await runtimeSession.getState(),
-        capabilities: capabilitiesForSession(mcpConfig !== null),
-        cleanup: combineCleanup([mcpConfig?.cleanup, paseoExtension?.cleanup]),
-        extensionTimeoutMs: this.providerParams.extensionTimeoutMs,
-      });
-    } catch (error) {
-      await runtimeSession.close().catch(() => undefined);
-      mcpConfig?.cleanup();
-      paseoExtension?.cleanup();
-      throw error;
-    }
   }
 
   async fetchCatalog(options: FetchCatalogOptions): Promise<ProviderCatalog> {
