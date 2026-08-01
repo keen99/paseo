@@ -33,17 +33,15 @@ import { join } from "node:path";
 const DEBUG = true;
 const DEBUG_LOG_PATH = "/tmp/paseo-pi-bridge.log";
 
+function formatLogValue(value) {
+  if (value instanceof Error) return value.stack ?? value.message;
+  if (typeof value === "string") return value;
+  return JSON.stringify(value, jsonReplacer);
+}
+
 function log(...args) {
   if (!DEBUG) return;
-  const text = args
-    .map((value) =>
-      value instanceof Error
-        ? value.stack ?? value.message
-        : typeof value === "string"
-          ? value
-          : JSON.stringify(value, jsonReplacer),
-    )
-    .join(" ");
+  const text = args.map(formatLogValue).join(" ");
   try {
     appendFileSync(
       DEBUG_LOG_PATH,
@@ -113,6 +111,23 @@ async function installCommandDispatcherPatch() {
   }
 }
 
+function installCommandUiOutputPatch(ctx) {
+  const ui = ctx?.ui;
+  const current = ui?.notify;
+  if (typeof current !== "function" || current.__paseoBridgeCapture) return;
+  const original = current.__paseoBridgeOriginal ?? current;
+  const wrapped = function (message, level, ...args) {
+    if (globalThis[COMMAND_ACTIVE_KEY]) {
+      globalThis[COMMAND_OUTPUT_KEY]?.(message, level ?? "info");
+    }
+    return original.call(this, message, level, ...args);
+  };
+  wrapped.__paseoBridgeCapture = true;
+  wrapped.__paseoBridgeOriginal = original;
+  ui.notify = wrapped;
+  log("extension UI notify patch installed");
+}
+
 async function dispatchSlashCommand(text) {
   const mode = globalThis[COMMAND_MODE_KEY];
   const submit = mode?.editor?.onSubmit ?? mode?.defaultEditor?.onSubmit;
@@ -177,11 +192,13 @@ export default function paseoPiBridge(pi) {
     broadcast({ dir: "out", type: "state", state: { ...state } });
 
   let lastCommandOutput = { text: "", at: 0 };
+  const ansiEscapePattern = new RegExp(String.raw`\x1B\[[0-?]*[ -/]*[@-~]`, "g");
   const commandOutput = (message, type) => {
-    const text = String(message ?? "").replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "").trim();
+    const text = String(message ?? "").replace(ansiEscapePattern, "").trim();
     const now = Date.now();
     if (text && (text !== lastCommandOutput.text || now - lastCommandOutput.at > 100)) {
       lastCommandOutput = { text, at: now };
+      log("command output:", type, text.slice(0, 160));
       broadcast({
         dir: "out",
         type: "event",
@@ -341,6 +358,7 @@ export default function paseoPiBridge(pi) {
   pi.on("session_start", async (event, ctx) => {
     extensionContext = ctx;
     await installCommandDispatcherPatch();
+    installCommandUiOutputPatch(ctx);
     if (listening) {
       setBridgeStatus(
         clients.size > 0 ? `Paseo bridge: live (${clients.size})` : "Paseo bridge: idle",
