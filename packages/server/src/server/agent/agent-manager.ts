@@ -44,6 +44,7 @@ import {
   type ListImportableSessionsOptions,
 } from "./agent-sdk-types.js";
 import { buildArchivedAgentRecord, type ArchivedStoredAgentRecord } from "./agent-archive.js";
+import { clearPaseoLiveMarker, writePaseoLiveMarker } from "./paseo-live-marker.js";
 import type { StoredAgentRecord, AgentStorage } from "./agent-storage.js";
 import type { AgentOwner } from "./agent-owner.js";
 import {
@@ -1450,6 +1451,7 @@ export class AgentManager {
       persistError = error;
     }
     this.emitClosedAgent(closedAgent, { persist: false });
+    await clearPaseoLiveMarker(closedAgent.persistence?.nativeHandle, this.logger);
     this.logger.trace(
       {
         agentId,
@@ -2792,6 +2794,7 @@ export class AgentManager {
       this.touchUpdatedAt(managed);
       await this.persistSnapshot(managed);
       this.assertAgentRegistrationActive(managed);
+      await writePaseoLiveMarker(managed.persistence?.nativeHandle, this.logger);
       this.emitState(managed, { persist: false });
       this.subscribeToSession(managed);
       return { ...managed };

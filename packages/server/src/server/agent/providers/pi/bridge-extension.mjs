@@ -176,6 +176,21 @@ export default function paseoPiBridge(pi) {
       log("setStatus failed:", error?.message);
     }
   };
+  const clearBridgeStatus = () => {
+    try {
+      extensionContext?.ui?.setStatus?.("paseo-bridge", undefined);
+    } catch {
+      // ignore
+    }
+  };
+  const liveMarkerExists = () => {
+    if (!state.sessionFile) return false;
+    return existsSync(`${state.sessionFile}.paseo.live`);
+  };
+  const refreshStatusForClients = () => {
+    if (!listening || !liveMarkerExists()) return;
+    setBridgeStatus(clients.size > 0 ? "◀P●" : "◀P");
+  };
   const state = {
     sessionFile: null,
     sessionId: null,
@@ -281,7 +296,7 @@ export default function paseoPiBridge(pi) {
   const server = createServer((sock) => {
     clients.add(sock);
     log("client connected, total=", clients.size);
-    setBridgeStatus(`Paseo bridge: live (${clients.size})`);
+    refreshStatusForClients();
     sock.setEncoding("utf8");
     sock.write(
       JSON.stringify({ dir: "out", type: "hello", state: { ...state } }, jsonReplacer) + "\n",
@@ -314,9 +329,7 @@ export default function paseoPiBridge(pi) {
     sock.on("close", () => {
       clients.delete(sock);
       log("client closed, remaining=", clients.size);
-      setBridgeStatus(
-        clients.size > 0 ? `Paseo bridge: live (${clients.size})` : "Paseo bridge: idle",
-      );
+      refreshStatusForClients();
     });
     sock.on("error", (e) => { log("client sock err:", e?.message); clients.delete(sock); });
   });
@@ -324,7 +337,7 @@ export default function paseoPiBridge(pi) {
   server.on("error", (e) => {
     listening = false;
     log("server error:", e?.message);
-    setBridgeStatus(`Paseo bridge error: ${e?.code ?? e?.message ?? "unknown"}`);
+    setBridgeStatus(`◀P!${e?.code ?? e?.message ?? ""}`.slice(0, 12));
   });
 
   const socketHasLiveOwner = (path) =>
@@ -386,13 +399,20 @@ export default function paseoPiBridge(pi) {
     await predecessorClose;
     await closePromise;
     if (!state.sessionId) return;
+    if (!liveMarkerExists()) {
+      log("no paseo.live marker; bridge silent", state.sessionFile);
+      return;
+    }
     const targetPath = socketPathForSession(state.sessionId);
-    if (listening && sockPath === targetPath) return;
+    if (listening && sockPath === targetPath) {
+      refreshStatusForClients();
+      return;
+    }
     if (server.listening) await closeBridge();
     if (existsSync(targetPath)) {
       if (await socketHasLiveOwner(targetPath)) {
         log("session socket already owned by live Pi process:", targetPath);
-        setBridgeStatus("Paseo bridge: duplicate Pi session already live");
+        setBridgeStatus("◀P!");
         return;
       }
       log("removing stale session socket:", targetPath);
@@ -402,7 +422,7 @@ export default function paseoPiBridge(pi) {
     server.listen(targetPath, () => {
       listening = true;
       log("listening:", targetPath);
-      setBridgeStatus("Paseo bridge: idle");
+      refreshStatusForClients();
     });
   };
 
@@ -429,6 +449,7 @@ export default function paseoPiBridge(pi) {
   }
   const disposeBridge = () => {
     clearInterval(heartbeatTimer);
+    clearBridgeStatus();
     return closeBridge();
   };
   globalThis[registryKey] = { server, clients, heartbeatTimer, close: disposeBridge };
@@ -445,11 +466,7 @@ export default function paseoPiBridge(pi) {
     extensionContext = ctx;
     await installCommandDispatcherPatch();
     installCommandUiOutputPatch(ctx);
-    if (listening) {
-      setBridgeStatus(
-        clients.size > 0 ? `Paseo bridge: live (${clients.size})` : "Paseo bridge: idle",
-      );
-    }
+    if (listening) refreshStatusForClients();
     const sm = ctx?.sessionManager;
     if (sm) {
       state.sessionFile = sm.getSessionFile?.() ?? sm.sessionFile ?? null;
@@ -457,9 +474,21 @@ export default function paseoPiBridge(pi) {
       state.sessionName = sm.getSessionName?.() ?? sm.sessionName ?? null;
       log("session_start:", state.sessionId, state.sessionFile);
     }
-    await listen();
     sendState();
     broadcast({ dir: "out", type: "event", event: { type: "session_start", data: event } });
+    await listen();
+    const markerWatcher = setInterval(() => {
+      if (!state.sessionFile) return;
+      if (!liveMarkerExists() && listening) {
+        log("paseo.live marker removed; tearing down bridge");
+        clearBridgeStatus();
+        void closeBridge();
+      } else if (liveMarkerExists() && !listening) {
+        log("paseo.live marker appeared; binding bridge");
+        void listen();
+      }
+    }, 2_000);
+    markerWatcher.unref?.();
   });
 
   pi.on("agent_start", async (event) => {
@@ -497,6 +526,7 @@ export default function paseoPiBridge(pi) {
   pi.on("session_shutdown", async () => {
     log("session_shutdown");
     broadcast({ dir: "out", type: "event", event: { type: "session_shutdown" } });
+    setBridgeStatus(undefined);
     setBridgeStatus(undefined);
     await closeBridge();
   });
