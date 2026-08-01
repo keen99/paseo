@@ -26,7 +26,7 @@
  * Set PASEO_BRIDGE_DEBUG=1 to enable verbose stderr logging.
  */
 
-import { createServer } from "node:net";
+import { createConnection, createServer } from "node:net";
 import { appendFileSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 
@@ -326,8 +326,28 @@ export default function paseoPiBridge(pi) {
     setBridgeStatus(`Paseo bridge error: ${e?.code ?? e?.message ?? "unknown"}`);
   });
 
-  const listen = () => {
+  const socketHasLiveOwner = () =>
+    new Promise((resolve) => {
+      const probe = createConnection(sockPath);
+      let settled = false;
+      const finish = (live) => {
+        if (settled) return;
+        settled = true;
+        probe.destroy();
+        resolve(live);
+      };
+      probe.once("connect", () => finish(true));
+      probe.once("error", () => finish(false));
+      probe.setTimeout(500, () => finish(false));
+    });
+
+  const listen = async () => {
     if (existsSync(sockPath)) {
+      if (await socketHasLiveOwner()) {
+        log("socket already owned by live Pi process:", sockPath);
+        setBridgeStatus("Paseo bridge: another Pi owns cwd socket");
+        return;
+      }
       log("removing stale sock:", sockPath);
       try { unlinkSync(sockPath); } catch (e) { log("unlink failed:", e?.message); }
     }
