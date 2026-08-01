@@ -1,0 +1,12 @@
+{
+  "name": "@getpaseo/pi-paseo-bridge",
+  "version": "0.2.5",
+  "private": true,
+  "description": "Pi extension: live bridge between a running Pi session and the Paseo backend.",
+  "type": "module",
+  "pi": {
+    "extensions": [
+      "./extension.mjs"
+    ]
+  }
+}

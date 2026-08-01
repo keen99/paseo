@@ -2,7 +2,7 @@
  * Pi live-attach client. Connects to bridge extension unix socket.
  * Implements PiRuntimeSession over bridge JSONL protocol.
  *
- * See bridge-extension.mjs for protocol.
+ * See pi-paseo-bridge/extension.mjs for protocol.
  */
 import { connect, type Socket } from "node:net";
 import { readdir } from "node:fs/promises";
@@ -36,7 +36,7 @@ export interface DiscoveredPiBridge extends BridgeHello {
   socketPath: string;
 }
 
-/** Build session-addressed bridge path. Mirrors bridge-extension socketPathForSession. */
+/** Build session-addressed bridge path. Mirrors pi-paseo-bridge socketPathForSession. */
 export function bridgeSocketPathForSession(sessionId: string): string {
   const slug = String(sessionId)
     .replace(/[^a-zA-Z0-9_-]+/g, "-")

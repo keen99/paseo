@@ -286,6 +286,29 @@ export default function paseoPiBridge(pi) {
   };
   globalThis[COMMAND_OUTPUT_KEY] = commandOutput;
 
+  const handleSlash = async (message) => {
+    try {
+      await dispatchSlashCommand(message.trim());
+    } catch (error) {
+      const text = String(error?.message ?? error);
+      log("slash command failed:", text);
+      commandOutput(text, "warning");
+      broadcast({
+        dir: "out",
+        type: "event",
+        event: { type: "agent_end", data: { messages: [] } },
+      });
+      return;
+    }
+    if (!state.isStreaming) {
+      broadcast({
+        dir: "out",
+        type: "event",
+        event: { type: "agent_end", data: { messages: [] } },
+      });
+    }
+  };
+
   const handleInbound = async (msg) => {
     if (msg.dir !== "in") return;
     log("inbound:", msg.type);
@@ -293,14 +316,7 @@ export default function paseoPiBridge(pi) {
       case "prompt": {
         const message = msg.message ?? "";
         if (message.trimStart().startsWith("/")) {
-          await dispatchSlashCommand(message.trim());
-          if (!state.isStreaming) {
-            broadcast({
-              dir: "out",
-              type: "event",
-              event: { type: "agent_end", data: { messages: [] } },
-            });
-          }
+          await handleSlash(message);
         } else {
           await pi.sendUserMessage(message, {
             images: msg.images,
@@ -312,14 +328,7 @@ export default function paseoPiBridge(pi) {
       case "steer": {
         const message = msg.message ?? "";
         if (message.trimStart().startsWith("/")) {
-          await dispatchSlashCommand(message.trim());
-          if (!state.isStreaming) {
-            broadcast({
-              dir: "out",
-              type: "event",
-              event: { type: "agent_end", data: { messages: [] } },
-            });
-          }
+          await handleSlash(message);
         } else {
           await pi.sendUserMessage(message, {
             images: msg.images,
