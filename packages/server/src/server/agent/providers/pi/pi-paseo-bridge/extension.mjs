@@ -26,6 +26,7 @@
  * Set PASEO_BRIDGE_DEBUG=1 to enable verbose stderr logging.
  */
 
+import { createRequire } from "node:module";
 import { createConnection, createServer } from "node:net";
 import { appendFileSync, existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
@@ -62,6 +63,7 @@ let InteractiveMode;
 async function installCommandDispatcherPatch() {
   if (commandPatchInstalled) return;
   try {
+    const require = createRequire(import.meta.url);
     const piRoot = require
       .resolve("@earendil-works/pi-coding-agent")
       .replace(/\/dist\/.*$/, "");
@@ -181,17 +183,17 @@ function finalizeInteractiveGuard(focusGuard, editor, commandName) {
 }
 
 async function dispatchSlashCommand(text) {
-  const mode = globalThis[COMMAND_MODE_KEY];
   const commandName = text.slice(1).split(/\s+/, 1)[0];
+  const mode = globalThis[COMMAND_MODE_KEY];
   const extensionCommand = mode?.session?.extensionRunner?.getCommand?.(commandName);
-  const submit = mode?.editor?.onSubmit ?? mode?.defaultEditor?.onSubmit;
-  if (!extensionCommand && typeof submit !== "function") {
-    throw new Error("Pi interactive command dispatcher unavailable");
-  }
   if (!extensionCommand && isInteractiveBuiltin(commandName)) {
     throw new Error(
       `/${commandName} opens an interactive picker in the Pi TUI and is not supported via Paseo. Run it in your Pi terminal instead.`,
     );
+  }
+  const submit = mode?.editor?.onSubmit ?? mode?.defaultEditor?.onSubmit;
+  if (!extensionCommand && typeof submit !== "function") {
+    throw new Error("Pi interactive command dispatcher unavailable");
   }
   const editor = mode?.editor ?? mode?.defaultEditor;
   const focusGuard = installSetFocusInterceptor(mode?.ui, editor);
