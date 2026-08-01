@@ -128,6 +128,58 @@ function installCommandUiOutputPatch(ctx) {
   log("extension UI notify patch installed");
 }
 
+const INTERACTIVE_BUILTIN_COMMANDS = new Set([
+  "settings",
+  "model",
+  "scoped-models",
+  "fork",
+  "tree",
+  "login",
+  "logout",
+  "resume",
+  "import",
+]);
+
+function isInteractiveBuiltin(commandName) {
+  return INTERACTIVE_BUILTIN_COMMANDS.has(commandName);
+}
+
+function installSetFocusInterceptor(ui, editor) {
+  if (!ui || typeof ui.setFocus !== "function") {
+    return null;
+  }
+  const original = ui.setFocus;
+  let interactiveHit = false;
+  ui.setFocus = function setFocusInterceptor(target) {
+    if (globalThis[COMMAND_ACTIVE_KEY] && target && target !== editor) {
+      interactiveHit = true;
+      throw new Error(
+        "Command opened an interactive UI surface; not supported via Paseo. Run it in your Pi terminal instead.",
+      );
+    }
+    return original.call(this, target);
+  };
+  return {
+    wasHit: () => interactiveHit,
+    restore: () => {
+      ui.setFocus = original;
+    },
+  };
+}
+
+function finalizeInteractiveGuard(focusGuard, editor, commandName) {
+  focusGuard?.restore();
+  if (!focusGuard?.wasHit()) return;
+  try {
+    if (editor && typeof editor.focus === "function") editor.focus();
+  } catch {
+    /* ignore */
+  }
+  throw new Error(
+    `/${commandName} opened an interactive UI surface; not supported via Paseo. Run it in your Pi terminal instead.`,
+  );
+}
+
 async function dispatchSlashCommand(text) {
   const mode = globalThis[COMMAND_MODE_KEY];
   const commandName = text.slice(1).split(/\s+/, 1)[0];
@@ -136,6 +188,13 @@ async function dispatchSlashCommand(text) {
   if (!extensionCommand && typeof submit !== "function") {
     throw new Error("Pi interactive command dispatcher unavailable");
   }
+  if (!extensionCommand && isInteractiveBuiltin(commandName)) {
+    throw new Error(
+      `/${commandName} opens an interactive picker in the Pi TUI and is not supported via Paseo. Run it in your Pi terminal instead.`,
+    );
+  }
+  const editor = mode?.editor ?? mode?.defaultEditor;
+  const focusGuard = installSetFocusInterceptor(mode?.ui, editor);
   globalThis[COMMAND_ACTIVE_KEY] = true;
   try {
     if (extensionCommand) {
@@ -145,6 +204,7 @@ async function dispatchSlashCommand(text) {
     }
   } finally {
     globalThis[COMMAND_ACTIVE_KEY] = false;
+    finalizeInteractiveGuard(focusGuard, editor, commandName);
   }
   return mode;
 }
