@@ -344,15 +344,33 @@ export default function paseoPiBridge(pi) {
     new Promise((resolve) => {
       const probe = createConnection(path);
       let settled = false;
+      let buf = "";
       const finish = (live) => {
         if (settled) return;
         settled = true;
         probe.destroy();
         resolve(live);
       };
-      probe.once("connect", () => finish(true));
+      probe.setEncoding("utf8");
+      probe.once("connect", () => {
+        // Accept alone is insufficient: a zombie listener accepts then dies
+        // without writing hello. Require a real hello frame before declaring live.
+      });
+      probe.on("data", (chunk) => {
+        buf += chunk;
+        const newline = buf.indexOf("\n");
+        if (newline >= 0) {
+          try {
+            const msg = JSON.parse(buf.slice(0, newline));
+            if (msg.dir === "out" && msg.type === "hello") finish(true);
+            else finish(false);
+          } catch {
+            finish(false);
+          }
+        }
+      });
       probe.once("error", () => finish(false));
-      probe.setTimeout(500, () => finish(false));
+      probe.setTimeout(750, () => finish(false));
     });
 
   const unlinkOwnedSocket = (path) => {
