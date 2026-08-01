@@ -64,11 +64,7 @@ import { materializeProviderImage } from "../provider-image-output.js";
 import { PiCliRuntime } from "./cli-runtime.js";
 import { revertPiConversation } from "./rewind.js";
 import { listPiImportableSessions, readPiImportSessionConfig } from "./session-descriptor.js";
-import {
-  PiBridgeAttachSession,
-  bridgeSocketExists,
-  discoverLivePiBridges,
-} from "./bridge-attach.js";
+import { PiBridgeAttachSession, discoverLivePiBridges } from "./bridge-attach.js";
 import type { PiRuntime, PiRuntimeSession, PiStartSessionInput } from "./runtime.js";
 import type {
   PiAgentSessionEvent,
@@ -2471,25 +2467,29 @@ export class PiRpcAgentClient implements AgentClient {
     const persistenceMetadata = parsePersistenceMetadata(handle.metadata);
     const resumeConfig = buildResumeConfig(persistenceMetadata, overrides, this.provider);
 
-    if (
-      await bridgeSocketExists(resumeConfig.cwd, {
-        expectedSessionFile: sessionFile,
-        expectedSessionId: handle.sessionId,
-      })
-    ) {
-      try {
+    const liveBridges = await discoverLivePiBridges({
+      cwd: resumeConfig.cwd,
+      expectedSessionFile: sessionFile,
+      expectedSessionId: handle.sessionId,
+    });
+    if (liveBridges.length > 0) {
+      if (liveBridges.length === 1) {
         return await this.attachToLiveSession({
           cwd: resumeConfig.cwd,
           config: resumeConfig.config,
           expectedSessionFile: sessionFile,
           expectedSessionId: handle.sessionId,
         });
-      } catch (error) {
-        this.logger.debug(
-          { err: error, cwd: resumeConfig.cwd, sessionId: handle.sessionId },
-          "Live Pi bridge did not match persisted session; falling back to provider resume",
-        );
       }
+      throw new Error(
+        `Multiple live Pi bridges match session ${handle.sessionId ?? sessionFile}; refusing to spawn. Quit the extra Pi processes and retry.`,
+      );
+    }
+    const liveCwdBridges = await discoverLivePiBridges({ cwd: resumeConfig.cwd });
+    if (liveCwdBridges.length > 0) {
+      throw new Error(
+        `Live Pi process exists in ${resumeConfig.cwd} but none matches session ${handle.sessionId ?? sessionFile}. Reload that Pi with the Paseo bridge extension, or attach to the matching session instead.`,
+      );
     }
 
     const mcpEnv = {
