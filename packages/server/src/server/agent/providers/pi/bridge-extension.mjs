@@ -130,13 +130,19 @@ function installCommandUiOutputPatch(ctx) {
 
 async function dispatchSlashCommand(text) {
   const mode = globalThis[COMMAND_MODE_KEY];
+  const commandName = text.slice(1).split(/\s+/, 1)[0];
+  const extensionCommand = mode?.session?.extensionRunner?.getCommand?.(commandName);
   const submit = mode?.editor?.onSubmit ?? mode?.defaultEditor?.onSubmit;
-  if (typeof submit !== "function") {
+  if (!extensionCommand && typeof submit !== "function") {
     throw new Error("Pi interactive command dispatcher unavailable");
   }
   globalThis[COMMAND_ACTIVE_KEY] = true;
   try {
-    await submit(text);
+    if (extensionCommand) {
+      await mode.session.prompt(text);
+    } else {
+      await submit(text);
+    }
   } finally {
     globalThis[COMMAND_ACTIVE_KEY] = false;
   }
