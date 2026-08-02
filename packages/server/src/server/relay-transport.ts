@@ -57,6 +57,7 @@ const CONTROL_PING_INTERVAL_MS = 10_000;
 const CONTROL_STALE_TIMEOUT_MS = 30_000;
 const CONTROL_READY_TIMEOUT_MS = 8_000;
 const RELAY_WEBSOCKET_OPTIONS = { handshakeTimeout: 10_000, perMessageDeflate: false } as const;
+const relaySentBuffers = new WeakMap<RelayWebSocketLike, string[]>();
 
 function createDefaultRelayWebSocket(url: string): RelayWebSocketLike {
   return new WebSocket(url, RELAY_WEBSOCKET_OPTIONS);
@@ -394,10 +395,12 @@ export function startRelayTransport({
 
     socket.on("close", (code, reason) => {
       clearTimeout(openTimeout);
+      const recentSent = relaySentBuffers.get(socket);
       relayLogger.warn(
-        { code, reason: reason?.toString?.(), url, connectionId },
+        { code, reason: reason?.toString?.(), url, connectionId, recentSent },
         "relay_data_disconnected",
       );
+      relaySentBuffers.delete(socket);
       if (dataSockets.get(connectionId) === socket) {
         dataSockets.delete(connectionId);
       }
@@ -421,7 +424,9 @@ async function attachEncryptedSocket(
   metadata?: ExternalSocketMetadata,
 ): Promise<void> {
   try {
-    const relayTransport = createRelayTransportAdapter(socket, logger);
+    const relayTransport = createRelayTransportAdapter(socket, logger, (buffer) => {
+      relaySentBuffers.set(socket, buffer);
+    });
     const emitter = new EventEmitter();
     const pendingMessages: Array<string | ArrayBuffer> = [];
     let attached = false;
@@ -465,22 +470,35 @@ async function attachEncryptedSocket(
 function createRelayTransportAdapter(
   socket: RelayWebSocketLike,
   logger: pino.Logger,
+  registerBuffer?: (buffer: string[]) => void,
 ): RelayTransport {
+  const recentSent: string[] = [];
+  registerBuffer?.(recentSent);
+  const pushSent = (data: string | Uint8Array | ArrayBuffer) => {
+    try {
+      const text = typeof data === "string" ? data : new TextDecoder().decode(data);
+      recentSent.push(text.length > 400 ? `${text.slice(0, 400)}…<+${text.length - 400}>` : text);
+      while (recentSent.length > 20) recentSent.shift();
+    } catch {
+      /* ignore */
+    }
+  };
   const relayTransport: RelayTransport = {
     send: (data) =>
       new Promise<void>((resolve, reject) => {
         try {
+          pushSent(data);
           socket.send(data, (error) => {
             if (!error) {
               resolve();
               return;
             }
-            logger.warn({ err: error }, "relay_socket_send_failed");
+            logger.warn({ err: error, recentSent }, "relay_socket_send_failed");
             reject(error);
           });
         } catch (error) {
           const err = error instanceof Error ? error : new Error(String(error));
-          logger.warn({ err }, "relay_socket_send_failed");
+          logger.warn({ err, recentSent }, "relay_socket_send_failed");
           reject(err);
         }
       }),
