@@ -2238,7 +2238,7 @@ export class PiRpcAgentSession implements AgentSession {
       this.activeAssistantMessageId = event.message.responseId || null;
       return;
     }
-    if (event.message.role === "user" && this.activeClientMessageId === null) {
+    if (event.message.role === "user") {
       const text = getUserMessageText(event.message.content);
       if (text && !text.startsWith(`/${PASEO_PI_CAPTURE_EXTENSION_COMMAND} `)) {
         this.emit({
@@ -2246,6 +2246,7 @@ export class PiRpcAgentSession implements AgentSession {
           provider: this.provider,
           turnId: this.currentTurnIdForEvent(),
           item: { type: "user_message", text },
+          ...(this.activeClientMessageId ? { clientMessageId: this.activeClientMessageId } : {}),
         });
       }
     }
