@@ -81,6 +81,7 @@ import { ComposerToolbarGlyph } from "@/composer/agent-controls/glyph";
 import { AgentControlTrigger } from "@/composer/agent-controls/control";
 import { CompactModelSheet } from "@/composer/agent-controls/model-sheet";
 import { usePiLiveHealth, type PiTailHealth } from "@/composer/pi-live-health";
+import { PI_LIVE_UI } from "@/composer/pi-live-feature-flag";
 
 interface AgentControlOption {
   id: string;
@@ -996,7 +997,7 @@ function DesktopAgentControlsContent(props: DesktopAgentControlsContentProps) {
         </>
       ) : null}
 
-      {provider === "pi" ? (
+      {provider === "pi" && PI_LIVE_UI ? (
         <PiLiveStatus
           bridge={liveState}
           tail={tailState}
@@ -1551,7 +1552,7 @@ export const AgentControls = memo(function AgentControls({
   const client = useSessionStore((state) => state.sessions[serverId]?.client ?? null);
   const toast = useToast();
   const modeControl = useLiveAgentModeControl(serverId, agentId);
-  const piLiveHealth = usePiLiveHealth(serverId, agentId);
+  const piLiveHealth = usePiLiveHealth(serverId, agentId, PI_LIVE_UI);
 
   const {
     entries: snapshotEntries,

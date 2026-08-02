@@ -93,6 +93,7 @@ import type { MessageInputKeyboardActionKind } from "@/keyboard/actions";
 import { submitAgentInput } from "@/composer/submit";
 import { ComposerKeyboardScopeProvider } from "@/composer/keyboard-scope";
 import { usePiLiveHealth } from "@/composer/pi-live-health";
+import { PI_LIVE_UI } from "@/composer/pi-live-feature-flag";
 import { useAppSettings } from "@/hooks/use-settings";
 import { isWeb, isNative } from "@/constants/platform";
 import type { ForgeSearchItem } from "@getpaseo/protocol/messages";
@@ -1073,7 +1074,7 @@ export function Composer({
   const { settings: appSettings } = useAppSettings();
 
   const agentState = useSessionStore(useShallow(buildAgentStateSelector(serverId, agentId)));
-  const piLiveHealth = usePiLiveHealth(serverId, agentId);
+  const piLiveHealth = usePiLiveHealth(serverId, agentId, PI_LIVE_UI);
 
   const queuedMessagesRaw = useSessionStore((state) =>
     state.sessions[serverId]?.queuedMessages?.get(agentId),
@@ -1088,7 +1089,7 @@ export function Composer({
   const isCompactLayout = resolveCompactLayout(isCompactLayoutOverride, isCompactFormFactor);
   const isDesktopWebBreakpoint = resolveIsDesktopWebBreakpoint(isCompactFormFactor);
   const isDesktopLayout = resolveIsDesktopWebBreakpoint(isCompactLayout);
-  const isPiLiveDisconnected = agentState.provider === "pi" && !piLiveHealth.live;
+  const isPiLiveDisconnected = PI_LIVE_UI && agentState.provider === "pi" && !piLiveHealth.live;
   const messagePlaceholder = isPiLiveDisconnected
     ? "Pi session disconnected — reload bridge or reconnect"
     : resolveMessagePlaceholder(isDesktopLayout, t);

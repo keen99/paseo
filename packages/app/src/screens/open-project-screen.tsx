@@ -23,6 +23,7 @@ import { buildHostAgentDetailRoute, buildSettingsHostSectionRoute } from "@/util
 import { ImportSessionSheet } from "@/components/import-session-sheet";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { useOpenProject } from "@/hooks/use-open-project";
+import { PI_LIVE_UI } from "@/composer/pi-live-feature-flag";
 import type { Href } from "expo-router";
 
 export function OpenProjectScreen() {
@@ -95,21 +96,43 @@ export function OpenProjectScreen() {
           <PaseoLogo size={52} />
         </View>
         <View style={styles.tiles}>
-          <HomeTile
-            icon={Inbox}
-            title={t("openProject.tiles.importSession.title")}
-            description={t("openProject.tiles.importSession.description")}
-            onPress={handleOpenImportSession}
-            testID="open-project-import-session"
-            accent
-          />
-          <HomeTile
-            icon={FolderOpen}
-            title={t("openProject.tiles.addProject.title")}
-            description={t("openProject.tiles.addProject.description")}
-            onPress={handleOpenPicker}
-            testID="open-project-submit"
-          />
+          {PI_LIVE_UI ? (
+            <>
+              <HomeTile
+                icon={Inbox}
+                title={t("openProject.tiles.importSession.title")}
+                description={t("openProject.tiles.importSession.description")}
+                onPress={handleOpenImportSession}
+                testID="open-project-import-session"
+                accent
+              />
+              <HomeTile
+                icon={FolderOpen}
+                title={t("openProject.tiles.addProject.title")}
+                description={t("openProject.tiles.addProject.description")}
+                onPress={handleOpenPicker}
+                testID="open-project-submit"
+              />
+            </>
+          ) : (
+            <>
+              <HomeTile
+                icon={FolderOpen}
+                title={t("openProject.tiles.addProject.title")}
+                description={t("openProject.tiles.addProject.description")}
+                onPress={handleOpenPicker}
+                testID="open-project-submit"
+                accent
+              />
+              <HomeTile
+                icon={Inbox}
+                title={t("openProject.tiles.importSession.title")}
+                description={t("openProject.tiles.importSession.description")}
+                onPress={handleOpenImportSession}
+                testID="open-project-import-session"
+              />
+            </>
+          )}
           <HomeTile
             icon={Plug}
             title={t("openProject.tiles.setupProviders.title")}

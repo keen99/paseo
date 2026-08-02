@@ -25,7 +25,7 @@ function resolveTailHealth(
   return heartbeatAgeMs <= HEARTBEAT_STALE_MS ? "connected" : "disconnected";
 }
 
-export function usePiLiveHealth(serverId: string, agentId: string): PiLiveHealth {
+export function usePiLiveHealth(serverId: string, agentId: string, enabled = true): PiLiveHealth {
   const client = useHostRuntimeClient(serverId);
   const transportConnected = useHostRuntimeIsConnected(serverId);
   const bridge = useSessionStore((state) =>
@@ -37,6 +37,7 @@ export function usePiLiveHealth(serverId: string, agentId: string): PiLiveHealth
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
+    if (!enabled) return;
     setLastHeartbeatAt(null);
     if (!client) return;
     return client.on("agent_stream", (message) => {
@@ -44,15 +45,27 @@ export function usePiLiveHealth(serverId: string, agentId: string): PiLiveHealth
         setLastHeartbeatAt(Date.now());
       }
     });
-  }, [agentId, client]);
+  }, [agentId, client, enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     const timer = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(timer);
-  }, []);
+  }, [enabled]);
 
   const heartbeatAgeMs = lastHeartbeatAt === null ? null : Math.max(0, now - lastHeartbeatAt);
   const tail = resolveTailHealth(transportConnected, heartbeatAgeMs);
+
+  if (!enabled) {
+    return {
+      bridge: "connected",
+      tail: "connected",
+      transportConnected,
+      lastHeartbeatAt: null,
+      heartbeatAgeMs: null,
+      live: true,
+    };
+  }
 
   return {
     bridge,

@@ -17,6 +17,7 @@ import { formatTimeAgo } from "@/utils/time";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
 import { useHostFeature } from "@/runtime/host-features";
 import { i18n } from "@/i18n/i18next";
+import { PI_LIVE_UI } from "@/composer/pi-live-feature-flag";
 import {
   aggregateSessionEntries,
   ALL_FILTER_VALUE,
@@ -242,7 +243,7 @@ function ImportSessionSheetRow({
           <Text style={styles.rowTitle} numberOfLines={1}>
             {title}
           </Text>
-          {entry.isLiveAttachable ? (
+          {PI_LIVE_UI && entry.isLiveAttachable ? (
             <View style={styles.liveBadge}>
               <Text style={styles.liveBadgeText}>LIVE</Text>
             </View>
