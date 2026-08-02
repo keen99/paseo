@@ -466,3 +466,9 @@ Tests use `isProviderAvailable(provider)` to skip when the binary or credentials
 **`defaultCommand` is a tuple.** The first element is the binary name, the rest are default arguments. The base class uses this to find the executable and spawn the process.
 
 **Runtime settings can override the command.** Users can configure custom binary paths or environment variables per provider via `ProviderRuntimeSettings`. Your factory in the registry should pass `runtimeSettings?.["your-provider"]` through to the constructor.
+
+---
+
+## Pi live-share TODOs
+
+**Follow-up / queued messages have no UI.** Live attach delivers follow-up and steer messages to Pi (delivered while streaming), but the browser shows no visual indicator that a message is queued vs delivered immediately. Users cannot tell whether their message was processed inline or is waiting. Needs a queued-state badge or separate queue list in the composer/timeline.
