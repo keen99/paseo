@@ -4,7 +4,6 @@
 
 <h1 align="center">Paseo</h1>
 
-
 ---
 
 **This fork is a prototype.**
@@ -20,10 +19,6 @@ This was built because paseo - like so many other tools like this - run it's on 
 I'd prefer to be able to _also_ have the option to control-without-takeover a running cli in my shell.
 
 The UI changes also allow the user to more easily import a pi session - no need to go hunting through your filesystem, all of the sessions you could --resume are exposed for you to select from.
-
-
-
-
 
 ---
 
