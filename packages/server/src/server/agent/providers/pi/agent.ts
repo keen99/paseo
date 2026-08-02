@@ -2105,13 +2105,10 @@ export class PiRpcAgentSession implements AgentSession {
         return;
       }
       case "tool_execution_update": {
-        const toolCall = this.activeToolCalls.get(event.toolCallId);
-        if (!toolCall) {
-          return;
-        }
-
-        const partialResult = parseToolResult(event.partialResult);
-        this.emitToolCallEvent(event.toolCallId, toolCall, "running", partialResult, null);
+        // Pi emits incremental tool output chunks frequently (streaming progress).
+        // Each re-emits the full accumulated detail, producing large payload storms
+        // (50KB+) that crash mobile clients. Skip streaming updates; the final
+        // tool_execution_end carries the complete result.
         return;
       }
       case "tool_execution_end": {
