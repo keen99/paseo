@@ -2245,8 +2245,11 @@ export class PiRpcAgentSession implements AgentSession {
           type: "timeline",
           provider: this.provider,
           turnId: this.currentTurnIdForEvent(),
-          item: { type: "user_message", text },
-          ...(this.activeClientMessageId ? { clientMessageId: this.activeClientMessageId } : {}),
+          item: {
+            type: "user_message",
+            text,
+            ...(this.activeClientMessageId ? { clientMessageId: this.activeClientMessageId } : {}),
+          },
         });
       }
     }
