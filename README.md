@@ -4,6 +4,29 @@
 
 <h1 align="center">Paseo</h1>
 
+
+---
+
+**This fork is a prototype.**
+
+---
+
+This is a `pi`-specific fork that allows you to join a live pi CLI session from web/mobile/desktop. It works with all in parallel. It only works in conjunction with the pi extension bundled in.
+
+the "live" specific modifications to the UI are not required to use a session - so you are able to use the app store published mobile app with this modified backend.
+
+This was built because paseo - like so many other tools like this - run it's on headless pi/codex/etc on the backend, so the web/app are the _only_ interface.
+
+I'd prefer to be able to _also_ have the option to control-without-takeover a running cli in my shell.
+
+The UI changes also allow the user to more easily import a pi session - no need to go hunting through your filesystem, all of the sessions you could --resume are exposed for you to select from.
+
+
+
+
+
+---
+
 <p align="center">
   <a href="README.md">English</a> ·
   <a href="README.zh-CN.md">简体中文</a> ·
@@ -125,10 +148,10 @@ npx skills add getpaseo/paseo
 
 Then use them in any agent conversation:
 
-- `/paseo-handoff` — hand off work between agents. I use this to plan with Claude and then handoff to Codex to implement.
-- `/paseo-loop` — loop an agent against clear acceptance criteria (aka Ralph loops), optionally with a verifier.
-- `/paseo-advisor` — spin up a single agent as an advisor for a second opinion, without delegating the work itself.
-- `/paseo-committee` — form a committee of two contrasting agents to step back, do root cause analysis, and produce a plan.
+- `/paseo-handoff` --- hand off work between agents. I use this to plan with Claude and then handoff to Codex to implement.
+- `/paseo-loop` --- loop an agent against clear acceptance criteria (aka Ralph loops), optionally with a verifier.
+- `/paseo-advisor` --- spin up a single agent as an advisor for a second opinion, without delegating the work itself.
+- `/paseo-committee` --- form a committee of two contrasting agents to step back, do root cause analysis, and produce a plan.
 
 ## Development
 
@@ -162,9 +185,9 @@ npm run typecheck
 
 ## Related projects
 
-- [getpaseo/paseo-relay](https://github.com/getpaseo/paseo-relay) — official distributed relay, written in Elixir
-- [paseo-skins](https://github.com/huangguang1999/paseo-skins) — community themes and a zero-patch desktop theme loader with an Agent Skill
-- [paseo-vscode](https://marketplace.visualstudio.com/items?itemName=hinnes.paseo-vscode) — VS Code extension
+- [getpaseo/paseo-relay](https://github.com/getpaseo/paseo-relay) --- official distributed relay, written in Elixir
+- [paseo-skins](https://github.com/huangguang1999/paseo-skins) --- community themes and a zero-patch desktop theme loader with an Agent Skill
+- [paseo-vscode](https://marketplace.visualstudio.com/items?itemName=hinnes.paseo-vscode) --- VS Code extension
 
 ## License
 
