@@ -1811,8 +1811,51 @@ export function HostTerminalsPage({ serverId }: { serverId: string }) {
       <SettingsSection title="Terminal agents">
         <EnableTerminalAgentHooksCard serverId={serverId} />
       </SettingsSection>
+      <PiSessionDiscoverySection serverId={serverId} />
       <TerminalProfilesSection serverId={serverId} />
     </View>
+  );
+}
+
+function PiSessionDiscoverySection({ serverId }: { serverId: string }) {
+  const { t } = useTranslation();
+  const isConnected = useHostRuntimeIsConnected(serverId);
+  const { config, patchConfig } = useDaemonConfig(serverId);
+
+  const handleScanToggle = useCallback(
+    (next: boolean) => {
+      void patchConfig({ piSessionDiscovery: { scanEnabled: next } }).catch((error) => {
+        console.error("[HostPage] Failed to update pi session discovery", error);
+        Alert.alert(
+          "Unable to update session discovery",
+          error instanceof Error ? error.message : String(error),
+        );
+      });
+    },
+    [patchConfig],
+  );
+
+  if (!isConnected) return null;
+
+  return (
+    <SettingsSection title={t("settings.piSessionDiscovery.title")}>
+      <View style={settingsStyles.card} testID="host-page-pi-session-discovery-card">
+        <View style={settingsStyles.row}>
+          <View style={settingsStyles.rowContent}>
+            <Text style={settingsStyles.rowTitle}>
+              {t("settings.piSessionDiscovery.scanTitle")}
+            </Text>
+            <Text style={settingsStyles.rowHint}>{t("settings.piSessionDiscovery.scanHint")}</Text>
+          </View>
+          <Switch
+            value={config?.piSessionDiscovery?.scanEnabled === true}
+            onValueChange={handleScanToggle}
+            accessibilityLabel={t("settings.piSessionDiscovery.scanTitle")}
+            testID="host-page-pi-session-discovery-switch"
+          />
+        </View>
+      </View>
+    </SettingsSection>
   );
 }
 

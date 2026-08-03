@@ -1129,6 +1129,12 @@ export const ptBR: TranslationResources = {
     settings: {
       loadFailed: "Não foi possível carregar as configurações do desktop.",
       saveFailed: "Não foi possível salvar as configurações do desktop.",
+      piSessionDiscovery: {
+        title: "Pi session discovery",
+        scanTitle: "Auto-discover all sessions",
+        scanHint:
+          "Show every pi session (all directories) in the session list, not just the current workspace.",
+      },
     },
     rosetta: {
       title: "Baixar a build para Apple Silicon",

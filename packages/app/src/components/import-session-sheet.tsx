@@ -13,6 +13,7 @@ import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-moda
 import { AdaptiveRenameModal } from "@/components/rename-modal";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Combobox, ComboboxItem, type ComboboxOption } from "@/components/ui/combobox";
+import { useDaemonConfig } from "@/hooks/use-daemon-config";
 import { getProviderIcon } from "@/components/provider-icons";
 import { formatTimeAgo } from "@/utils/time";
 import { useProvidersSnapshot } from "@/hooks/use-providers-snapshot";
@@ -75,10 +76,18 @@ function buildSessionsQueriesConfig(args: {
   visible: boolean;
   client: RecentProviderSessionsClient | null;
   cwd: string | null | undefined;
+  scanAllSessions: boolean;
   hostDisconnectedMessage?: string;
 }): SessionsQueryConfig[] {
-  const { providersToFetch, sessionsQueryRoot, visible, client, cwd, hostDisconnectedMessage } =
-    args;
+  const {
+    providersToFetch,
+    sessionsQueryRoot,
+    visible,
+    client,
+    cwd,
+    scanAllSessions,
+    hostDisconnectedMessage,
+  } = args;
   if (providersToFetch === null) return [];
   const enabled = visible && Boolean(client);
   return providersToFetch.map((provider) => ({
@@ -89,7 +98,7 @@ function buildSessionsQueriesConfig(args: {
         throw new Error(hostDisconnectedMessage ?? i18n.t("workspace.terminal.hostDisconnected"));
       }
       return await client.fetchRecentProviderSessions({
-        ...(cwd ? { cwd } : {}),
+        ...(cwd && !scanAllSessions ? { cwd } : {}),
         providers: [provider],
         limit: PER_PROVIDER_LIMIT,
       });
@@ -346,6 +355,8 @@ export function ImportSessionSheet({
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { theme } = useUnistyles();
+  const { config: daemonConfig } = useDaemonConfig(serverId);
+  const scanAllSessions = daemonConfig?.piSessionDiscovery?.scanEnabled === true;
 
   const { entries: snapshotEntries, supportsSnapshot } = useProvidersSnapshot(serverId, {
     cwd,
@@ -381,9 +392,10 @@ export function ImportSessionSheet({
         visible,
         client,
         cwd,
+        scanAllSessions,
         hostDisconnectedMessage: t("workspace.terminal.hostDisconnected"),
       }),
-    [providersToFetch, sessionsQueryRoot, visible, client, cwd, t],
+    [providersToFetch, sessionsQueryRoot, visible, client, cwd, scanAllSessions, t],
   );
 
   const queries = useQueries({ queries: queriesConfig });

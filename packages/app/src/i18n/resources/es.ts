@@ -1138,6 +1138,12 @@ export const es: TranslationResources = {
     settings: {
       loadFailed: "No se puede cargar la configuración del escritorio.",
       saveFailed: "No se puede guardar la configuración del escritorio.",
+      piSessionDiscovery: {
+        title: "Pi session discovery",
+        scanTitle: "Auto-discover all sessions",
+        scanHint:
+          "Show every pi session (all directories) in the session list, not just the current workspace.",
+      },
     },
     rosetta: {
       title: "Descargue la compilaciónApple Silicon",

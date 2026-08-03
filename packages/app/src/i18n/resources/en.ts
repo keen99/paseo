@@ -1114,6 +1114,12 @@ export const en = {
     settings: {
       loadFailed: "Unable to load desktop settings.",
       saveFailed: "Unable to save desktop settings.",
+      piSessionDiscovery: {
+        title: "Pi session discovery",
+        scanTitle: "Auto-discover all sessions",
+        scanHint:
+          "Show every pi session (all directories) in the session list, not just the current workspace.",
+      },
     },
     rosetta: {
       title: "Download the Apple Silicon build",
