@@ -20,6 +20,8 @@ I'd prefer to be able to _also_ have the option to control-without-takeover a ru
 
 The UI changes also allow the user to more easily import a pi session - no need to go hunting through your filesystem, all of the sessions you could --resume are exposed for you to select from.
 
+**Platform note:** Only tested on macOS. The bridge uses Unix domain sockets (`/tmp/paseo-pi-bridge-*.sock`) which work on macOS and Linux. Windows uses a different named-pipe scheme and is untested — expect it to not work. On startup the backend auto-registers the bundled pi extension in `~/.pi/agent/settings.json` so your own CLI sessions pick it up; this path logic is also macOS/Linux-flavored and untested on Windows.
+
 ---
 
 <p align="center">
