@@ -10,6 +10,7 @@ import type { AgentProvider } from "@getpaseo/protocol/agent-types";
 import { ChevronDown, Inbox, Layers, RotateCw } from "lucide-react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
+import { AdaptiveRenameModal } from "@/components/rename-modal";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Combobox, ComboboxItem, type ComboboxOption } from "@/components/ui/combobox";
 import { getProviderIcon } from "@/components/provider-icons";
@@ -202,6 +203,7 @@ function ImportSessionSheetRow({
   onImportSession,
   onTogglePin,
   onFork,
+  onRename,
 }: {
   entry: FetchRecentProviderSessionEntry;
   disabled: boolean;
@@ -210,6 +212,7 @@ function ImportSessionSheetRow({
   onImportSession: (entry: FetchRecentProviderSessionEntry) => void;
   onTogglePin?: (entry: FetchRecentProviderSessionEntry) => void;
   onFork?: (entry: FetchRecentProviderSessionEntry) => void;
+  onRename?: (entry: FetchRecentProviderSessionEntry) => void;
 }) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
@@ -230,6 +233,9 @@ function ImportSessionSheetRow({
   const handleFork = useCallback(() => {
     if (onFork) onFork(entry);
   }, [entry, onFork]);
+  const handleRename = useCallback(() => {
+    if (onRename) onRename(entry);
+  }, [entry, onRename]);
   const pressableStyle = useCallback(
     ({ pressed, hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.row,
@@ -278,6 +284,18 @@ function ImportSessionSheetRow({
               testID={`import-session-fork-${entry.providerId}-${entry.providerHandleId}`}
             >
               <Text style={styles.forkAction}>⎋</Text>
+            </Pressable>
+          ) : null}
+          {onRename ? (
+            <Pressable
+              onPress={handleRename}
+              disabled={disabled}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t("importSession.row.rename")}
+              testID={`import-session-rename-${entry.providerId}-${entry.providerHandleId}`}
+            >
+              <Text style={styles.renameAction}>✎</Text>
             </Pressable>
           ) : null}
           <Text style={styles.rowMeta}>
@@ -534,6 +552,40 @@ export function ImportSessionSheet({
     [forkMutation],
   );
 
+  const [renamingEntry, setRenamingEntry] = useState<FetchRecentProviderSessionEntry | null>(null);
+
+  const renameMutation = useMutation({
+    mutationFn: async (input: { entry: FetchRecentProviderSessionEntry; value: string }) => {
+      if (!client?.updateProviderSessionMeta) {
+        throw new Error(t("workspace.terminal.hostDisconnected"));
+      }
+      return client.updateProviderSessionMeta({
+        provider: input.entry.providerId,
+        providerHandleId: input.entry.providerHandleId,
+        meta: { displayName: input.value },
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: sessionsQueryRoot });
+    },
+  });
+
+  const handleRename = useCallback((entry: FetchRecentProviderSessionEntry) => {
+    setRenamingEntry(entry);
+  }, []);
+
+  const handleRenameSubmit = useCallback(
+    async (value: string) => {
+      if (!renamingEntry) return;
+      await renameMutation.mutateAsync({ entry: renamingEntry, value });
+    },
+    [renamingEntry, renameMutation],
+  );
+
+  const handleRenameClose = useCallback(() => {
+    setRenamingEntry(null);
+  }, []);
+
   const erroredProviderLabels = useMemo(
     () => collectErroredProviderLabels(providersToFetch, queries, providerLabelById),
     [queries, providersToFetch, providerLabelById],
@@ -644,11 +696,20 @@ export function ImportSessionSheet({
               onImportSession={handleImportSession}
               onTogglePin={handleTogglePin}
               onFork={handleFork}
+              onRename={handleRename}
             />
           ))}
         </View>
       ) : null}
       {showEmptyState ? <SheetEmptyState title={emptyStateTitle} /> : null}
+      <AdaptiveRenameModal
+        visible={renamingEntry !== null}
+        title={t("importSession.row.rename")}
+        initialValue={renamingEntry ? getSessionTitle(renamingEntry) : ""}
+        placeholder={renamingEntry?.title ?? ""}
+        onClose={handleRenameClose}
+        onSubmit={handleRenameSubmit}
+      />
     </AdaptiveModalSheet>
   );
 }
@@ -745,6 +806,11 @@ const styles = StyleSheet.create((theme) => ({
     marginLeft: theme.spacing[1],
   },
   forkAction: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.base,
+    paddingHorizontal: theme.spacing[1],
+  },
+  renameAction: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
     paddingHorizontal: theme.spacing[1],

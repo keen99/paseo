@@ -33,6 +33,9 @@ const { theme } = vi.hoisted(() => ({
       surface3: "#333",
       border: "#444",
       borderAccent: "#555",
+      accent: "#0066cc",
+      statusWarning: "#f59e0b",
+      palette: { red: { 300: "#f87171" } },
     },
   },
 }));
@@ -139,6 +142,12 @@ vi.mock("@/components/adaptive-modal-sheet", () => ({
         {children}
       </section>
     ) : null,
+  AdaptiveTextInput: (props: Record<string, unknown>) =>
+    React.createElement("input", { ...props, "data-testid": props.testID }),
+}));
+vi.mock("@/components/ui/button", () => ({
+  Button: (props: Record<string, unknown>) =>
+    React.createElement("button", { type: "button", ...props, "data-testid": props.testID }),
 }));
 
 vi.mock("react-native", async () => {

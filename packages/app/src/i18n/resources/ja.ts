@@ -340,6 +340,7 @@ export const ja: TranslationResources = {
     row: {
       importing: "インポート中...",
       fork: "Fork session",
+      rename: "Rename session",
     },
   },
   workspace: {

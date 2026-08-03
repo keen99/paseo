@@ -337,6 +337,7 @@ export const zhCN: TranslationResources = {
     row: {
       importing: "正在导入...",
       fork: "Fork session",
+      rename: "Rename session",
     },
   },
   workspace: {

@@ -339,6 +339,7 @@ export const ru: TranslationResources = {
     row: {
       importing: "Импорт...",
       fork: "Fork session",
+      rename: "Rename session",
     },
   },
   workspace: {
