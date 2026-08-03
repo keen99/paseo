@@ -9,4 +9,4 @@
  *
  * Toggle for testing main-UI flow without reverting code.
  */
-export const PI_LIVE_UI = false;
+export const PI_LIVE_UI = true;
