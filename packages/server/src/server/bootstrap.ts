@@ -517,6 +517,7 @@ function createInitialMutableDaemonConfig(config: PaseoDaemonConfig): MutableDae
     autoArchiveAfterMerge: config.autoArchiveAfterMerge ?? false,
     enableTerminalAgentHooks: config.enableTerminalAgentHooks ?? false,
     appendSystemPrompt: config.appendSystemPrompt ?? "",
+    piSessionDiscovery: { scanEnabled: false, scanIntervalMs: 60_000 },
   };
 
   if (config.terminalProfiles !== undefined) {

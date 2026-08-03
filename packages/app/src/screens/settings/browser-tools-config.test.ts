@@ -16,6 +16,7 @@ function makeConfig(browserToolsEnabled = false): MutableDaemonConfig {
     autoArchiveAfterMerge: false,
     enableTerminalAgentHooks: false,
     appendSystemPrompt: "",
+    piSessionDiscovery: { scanEnabled: false, scanIntervalMs: 60_000 },
   };
 }
 

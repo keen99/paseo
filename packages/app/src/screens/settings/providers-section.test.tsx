@@ -311,6 +311,7 @@ function makeConfig(providers: MutableDaemonConfig["providers"] = {}): MutableDa
     autoArchiveAfterMerge: false,
     enableTerminalAgentHooks: false,
     appendSystemPrompt: "",
+    piSessionDiscovery: { scanEnabled: false, scanIntervalMs: 60_000 },
   };
 }
 

@@ -41,6 +41,7 @@ const daemonConfig: MutableDaemonConfig = {
   autoArchiveAfterMerge: false,
   enableTerminalAgentHooks: false,
   appendSystemPrompt: "",
+  piSessionDiscovery: { scanEnabled: false, scanIntervalMs: 60_000 },
 };
 
 function createFakeClient(config: { rejectCheckoutDiffSubscribe?: boolean } = {}): {

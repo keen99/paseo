@@ -153,6 +153,12 @@ export const MutableDaemonConfigSchema = z
     enableTerminalAgentHooks: z.boolean().default(false),
     appendSystemPrompt: z.string().default(""),
     terminalProfiles: z.array(TerminalProfileSchema).optional(),
+    piSessionDiscovery: z
+      .object({
+        scanEnabled: z.boolean().default(false),
+        scanIntervalMs: z.number().int().positive().max(3_600_000).default(60_000),
+      })
+      .default({ scanEnabled: false, scanIntervalMs: 60_000 }),
   })
   .passthrough();
 
@@ -169,6 +175,12 @@ export const MutableDaemonConfigPatchSchema = z
     enableTerminalAgentHooks: z.boolean().optional(),
     appendSystemPrompt: z.string().optional(),
     terminalProfiles: z.array(TerminalProfileSchema).optional(),
+    piSessionDiscovery: z
+      .object({
+        scanEnabled: z.boolean().optional(),
+        scanIntervalMs: z.number().int().positive().max(3_600_000).optional(),
+      })
+      .optional(),
   })
   .partial()
   .passthrough();
