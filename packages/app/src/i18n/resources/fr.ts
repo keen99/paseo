@@ -1232,6 +1232,11 @@ export const fr: TranslationResources = {
       loadFailed: "Impossible de charger les journaux du démon:{{message}}",
     },
   },
+  piSessionList: {
+    searchPlaceholder: "Search sessions...",
+    empty: "No sessions found.",
+    title: "Sessions",
+  },
   openProject: {
     tiles: {
       addProject: {

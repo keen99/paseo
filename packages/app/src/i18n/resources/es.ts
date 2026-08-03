@@ -1230,6 +1230,11 @@ export const es: TranslationResources = {
       loadFailed: "No se pueden cargar registros de demonio:{{message}}",
     },
   },
+  piSessionList: {
+    searchPlaceholder: "Search sessions...",
+    empty: "No sessions found.",
+    title: "Sessions",
+  },
   openProject: {
     tiles: {
       addProject: {

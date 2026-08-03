@@ -271,6 +271,7 @@
         "packages/app/src/components/file-explorer-pane.tsx",
         "packages/app/src/components/file-pane.tsx",
         "packages/app/src/components/import-session-sheet.tsx",
+        "packages/app/src/components/pi-session-list.tsx",
         "packages/app/src/components/project-picker-modal.tsx",
         "packages/app/src/desktop/components/pair-device-section.tsx",
         "packages/app/src/screens/new-workspace-screen.tsx"

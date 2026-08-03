@@ -1200,6 +1200,11 @@ export const en = {
       loadFailed: "Unable to load daemon logs: {{message}}",
     },
   },
+  piSessionList: {
+    searchPlaceholder: "Search sessions...",
+    empty: "No sessions found.",
+    title: "Sessions",
+  },
   openProject: {
     tiles: {
       importSession: {

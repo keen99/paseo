@@ -1203,6 +1203,11 @@ export const ja: TranslationResources = {
       loadFailed: "デーモンログの読み込みに失敗しました: {{message}}",
     },
   },
+  piSessionList: {
+    searchPlaceholder: "Search sessions...",
+    empty: "No sessions found.",
+    title: "Sessions",
+  },
   openProject: {
     tiles: {
       addProject: {

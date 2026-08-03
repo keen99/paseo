@@ -1219,6 +1219,11 @@ export const ru: TranslationResources = {
       loadFailed: "Невозможно загрузить журналы демона:{{message}}",
     },
   },
+  piSessionList: {
+    searchPlaceholder: "Search sessions...",
+    empty: "No sessions found.",
+    title: "Sessions",
+  },
   openProject: {
     tiles: {
       addProject: {

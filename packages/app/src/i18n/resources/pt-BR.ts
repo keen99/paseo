@@ -1216,6 +1216,11 @@ export const ptBR: TranslationResources = {
       loadFailed: "Não foi possível carregar logs do daemon: {{message}}",
     },
   },
+  piSessionList: {
+    searchPlaceholder: "Search sessions...",
+    empty: "No sessions found.",
+    title: "Sessions",
+  },
   openProject: {
     tiles: {
       addProject: {

@@ -1173,6 +1173,11 @@ export const zhCN: TranslationResources = {
       loadFailed: "无法加载 daemon 日志：{{message}}",
     },
   },
+  piSessionList: {
+    searchPlaceholder: "Search sessions...",
+    empty: "No sessions found.",
+    title: "Sessions",
+  },
   openProject: {
     tiles: {
       addProject: {

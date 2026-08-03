@@ -21,6 +21,8 @@ import { useLocalDaemonServerId } from "@/hooks/use-is-local-daemon";
 import { PairDeviceModal } from "@/desktop/components/pair-device-modal";
 import { buildHostAgentDetailRoute, buildSettingsHostSectionRoute } from "@/utils/host-routes";
 import { ImportSessionSheet } from "@/components/import-session-sheet";
+import { PiSessionList } from "@/components/pi-session-list";
+import { useDaemonConfig } from "@/hooks/use-daemon-config";
 import { useHostRuntimeClient } from "@/runtime/host-runtime";
 import { useOpenProject } from "@/hooks/use-open-project";
 import { PI_LIVE_UI } from "@/composer/pi-live-feature-flag";
@@ -38,6 +40,8 @@ export function OpenProjectScreen() {
   const openImportedProject = useOpenProject(importServerId);
   const [isPairDeviceOpen, setIsPairDeviceOpen] = useState(false);
   const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
+  const { config: daemonConfig } = useDaemonConfig(localServerId);
+  const scanEnabled = daemonConfig?.piSessionDiscovery?.scanEnabled === true;
 
   const isCompactLayout = useIsCompactFormFactor();
 
@@ -95,6 +99,17 @@ export function OpenProjectScreen() {
         <View style={styles.logo}>
           <PaseoLogo size={52} />
         </View>
+        {PI_LIVE_UI && scanEnabled && localServerId ? (
+          <View style={styles.sessionListWrap}>
+            <PiSessionList
+              serverId={localServerId}
+              client={importClient}
+              scanAll
+              onImportedAgent={handleImported}
+              testID="open-project-session-list"
+            />
+          </View>
+        ) : null}
         <View style={styles.tiles}>
           {PI_LIVE_UI ? (
             <>
@@ -104,7 +119,7 @@ export function OpenProjectScreen() {
                 description={t("openProject.tiles.importSession.description")}
                 onPress={handleOpenImportSession}
                 testID="open-project-import-session"
-                accent
+                accent={!scanEnabled}
               />
               <HomeTile
                 icon={FolderOpen}
@@ -244,6 +259,12 @@ const styles = StyleSheet.create((theme) => ({
     flexWrap: "wrap",
     justifyContent: "flex-start",
     gap: theme.spacing[3],
+  },
+  sessionListWrap: {
+    width: "100%",
+    maxWidth: 640,
+    flex: 1,
+    marginTop: theme.spacing[4],
   },
   tile: {
     width: { xs: "100%", md: 220 },

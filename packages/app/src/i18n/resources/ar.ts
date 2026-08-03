@@ -1190,6 +1190,11 @@ export const ar: TranslationResources = {
       loadFailed: "غير قادر على تحميل سجلات البرنامج الخفي:{{message}}",
     },
   },
+  piSessionList: {
+    searchPlaceholder: "Search sessions...",
+    empty: "No sessions found.",
+    title: "Sessions",
+  },
   openProject: {
     tiles: {
       addProject: {
