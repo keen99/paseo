@@ -1127,6 +1127,36 @@ export const FetchRecentProviderSessionsRequestMessageSchema = z.object({
   limit: z.number().int().positive().max(200).optional(),
 });
 
+// Unified discovery metadata overlay (pi-live-share).
+// Write sparse paseo-meta sidecar next to a pi session jsonl.
+export const UpdateProviderSessionMetaRequestMessageSchema = z.object({
+  type: z.literal("update_provider_session_meta_request"),
+  requestId: z.string(),
+  provider: z.string(),
+  providerHandleId: z.string(),
+  meta: z.object({
+    displayName: z.string().nullable().optional(),
+    pinned: z.boolean().nullable().optional(),
+    folder: z.string().nullable().optional(),
+  }),
+});
+
+export const UpdateProviderSessionMetaResponseMessageSchema = z.object({
+  type: z.literal("update_provider_session_meta_response"),
+  payload: z.object({
+    requestId: z.string(),
+    provider: z.string(),
+    providerHandleId: z.string(),
+    meta: z.object({
+      displayName: z.string().optional(),
+      pinned: z.boolean().optional(),
+      folder: z.string().optional(),
+      forkedFrom: z.string().optional(),
+      forkedAt: z.string().optional(),
+    }),
+  }),
+});
+
 export const FetchAgentRequestMessageSchema = z.object({
   type: z.literal("fetch_agent_request"),
   requestId: z.string(),
@@ -2481,6 +2511,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   FetchAgentsRequestMessageSchema,
   FetchAgentHistoryRequestMessageSchema,
   FetchRecentProviderSessionsRequestMessageSchema,
+  UpdateProviderSessionMetaRequestMessageSchema,
   FetchWorkspacesRequestMessageSchema,
   ProjectListRequestMessageSchema,
   FetchAgentRequestMessageSchema,
@@ -5245,6 +5276,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   FetchAgentsResponseMessageSchema,
   FetchAgentHistoryResponseMessageSchema,
   FetchRecentProviderSessionsResponseMessageSchema,
+  UpdateProviderSessionMetaResponseMessageSchema,
   FetchWorkspacesResponseMessageSchema,
   ProjectAddResponseSchema,
   ProjectCreateDirectoryResponseSchema,

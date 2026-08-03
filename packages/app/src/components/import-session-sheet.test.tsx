@@ -10,7 +10,10 @@ import type {
 } from "@getpaseo/client/internal/daemon-client";
 import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ImportSessionSheet } from "@/components/import-session-sheet";
+import {
+  ImportSessionSheet,
+  type RecentProviderSessionsClient,
+} from "@/components/import-session-sheet";
 
 const { theme } = vi.hoisted(() => ({
   theme: {
@@ -175,10 +178,7 @@ interface RenderOptions {
   };
 }
 
-function renderSheet(
-  client: Pick<DaemonClient, "fetchRecentProviderSessions" | "importAgent">,
-  options?: RenderOptions,
-) {
+function renderSheet(client: RecentProviderSessionsClient, options?: RenderOptions) {
   mockSnapshot.current = {
     entries: options?.snapshot?.entries,
     supportsSnapshot: options?.snapshot?.supportsSnapshot ?? false,
@@ -214,8 +214,12 @@ function createRecentSessionsClient(
     "fetchRecentProviderSessions"
   >["fetchRecentProviderSessions"],
   importAgent: Pick<DaemonClient, "importAgent">["importAgent"],
-): Pick<DaemonClient, "fetchRecentProviderSessions" | "importAgent"> {
-  return { fetchRecentProviderSessions, importAgent };
+): RecentProviderSessionsClient {
+  return {
+    fetchRecentProviderSessions,
+    importAgent,
+    updateProviderSessionMeta: vi.fn(),
+  };
 }
 
 function createImportedAgentSnapshot(id: string): Awaited<ReturnType<DaemonClient["importAgent"]>> {
@@ -290,10 +294,10 @@ describe("ImportSessionSheet", () => {
     const fetchRecentProviderSessions = vi.fn();
     const importAgent = vi.fn();
 
-    renderSheet({ fetchRecentProviderSessions, importAgent } as Pick<
-      DaemonClient,
-      "fetchRecentProviderSessions" | "importAgent"
-    >);
+    renderSheet({
+      fetchRecentProviderSessions,
+      importAgent,
+    } as unknown as RecentProviderSessionsClient);
 
     await screen.findByText("Update the host to import sessions.");
     expect(fetchRecentProviderSessions).not.toHaveBeenCalled();
@@ -306,10 +310,7 @@ describe("ImportSessionSheet", () => {
     const importAgent = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         snapshot: { supportsSnapshot: true, entries: undefined },
       },
@@ -327,10 +328,7 @@ describe("ImportSessionSheet", () => {
     const importAgent = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         snapshot: { supportsSnapshot: true, entries: [createSnapshotEntry("claude")] },
       },
@@ -348,10 +346,7 @@ describe("ImportSessionSheet", () => {
     const importAgent = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         snapshot: { supportsSnapshot: true, entries: [createSnapshotEntry("claude")] },
       },
@@ -368,10 +363,7 @@ describe("ImportSessionSheet", () => {
     const importAgent = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         snapshot: { supportsSnapshot: true, entries: [createSnapshotEntry("claude")] },
       },
@@ -397,10 +389,7 @@ describe("ImportSessionSheet", () => {
     const importAgent = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         snapshot: { supportsSnapshot: true, entries: [createSnapshotEntry("claude")] },
       },
@@ -493,10 +482,7 @@ describe("ImportSessionSheet", () => {
     const onImportedAgent = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         onClose,
         onImportedAgent,
@@ -529,10 +515,7 @@ describe("ImportSessionSheet", () => {
     const onImportedAgent = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         onClose,
         onImportedAgent,
@@ -570,10 +553,7 @@ describe("ImportSessionSheet", () => {
     const importAgent = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         snapshot: {
           supportsSnapshot: true,
@@ -636,10 +616,7 @@ describe("ImportSessionSheet", () => {
     const importAgent = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         snapshot: {
           supportsSnapshot: true,
@@ -674,10 +651,7 @@ describe("ImportSessionSheet", () => {
     const importAgent = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         snapshot: {
           supportsSnapshot: true,
@@ -710,10 +684,7 @@ describe("ImportSessionSheet", () => {
     const importAgent = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         snapshot: {
           supportsSnapshot: true,
@@ -737,10 +708,7 @@ describe("ImportSessionSheet", () => {
     const importAgent = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         snapshot: {
           supportsSnapshot: true,
@@ -773,10 +741,7 @@ describe("ImportSessionSheet", () => {
     const importAgent = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         cwd: null,
         snapshot: { supportsSnapshot: true, entries: [createSnapshotEntry("claude")] },
@@ -812,10 +777,7 @@ describe("ImportSessionSheet", () => {
     const onClose = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         cwd: null,
         onClose,
@@ -854,10 +816,7 @@ describe("ImportSessionSheet", () => {
     const importAgent = vi.fn();
 
     renderSheet(
-      { fetchRecentProviderSessions, importAgent } as Pick<
-        DaemonClient,
-        "fetchRecentProviderSessions" | "importAgent"
-      >,
+      { fetchRecentProviderSessions, importAgent } as unknown as RecentProviderSessionsClient,
       {
         snapshot: { supportsSnapshot: true, entries: [createSnapshotEntry("claude")] },
       },

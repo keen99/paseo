@@ -35,9 +35,9 @@ import {
 const IMPORT_SHEET_SNAP_POINTS = ["70%", "92%"];
 const DISABLED_ACCESSIBILITY_STATE = { disabled: true };
 
-type RecentProviderSessionsClient = Pick<
+export type RecentProviderSessionsClient = Pick<
   DaemonClient,
-  "fetchRecentProviderSessions" | "importAgent"
+  "fetchRecentProviderSessions" | "importAgent" | "updateProviderSessionMeta"
 > &
   Partial<Pick<DaemonClient, "attachLiveAgent">>;
 

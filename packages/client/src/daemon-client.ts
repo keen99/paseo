@@ -2070,6 +2070,41 @@ export class DaemonClient {
     });
   }
 
+  async updateProviderSessionMeta(input: {
+    provider: string;
+    providerHandleId: string;
+    meta: {
+      displayName?: string | null;
+      pinned?: boolean | null;
+      folder?: string | null;
+    };
+    requestId?: string;
+  }): Promise<
+    Extract<SessionOutboundMessage, { type: "update_provider_session_meta_response" }>["payload"]
+  > {
+    const resolvedRequestId = this.createRequestId(input.requestId);
+    const message = SessionInboundMessageSchema.parse({
+      type: "update_provider_session_meta_request",
+      requestId: resolvedRequestId,
+      provider: input.provider,
+      providerHandleId: input.providerHandleId,
+      meta: input.meta,
+    });
+    return this.sendRequest({
+      requestId: resolvedRequestId,
+      message,
+      select: (msg) => {
+        if (msg.type !== "update_provider_session_meta_response") {
+          return null;
+        }
+        if (msg.payload.requestId !== resolvedRequestId) {
+          return null;
+        }
+        return msg.payload;
+      },
+    });
+  }
+
   async fetchWorkspaces(options?: FetchWorkspacesOptions): Promise<FetchWorkspacesPayload> {
     const resolvedRequestId = this.createRequestId(options?.requestId);
     const message = SessionInboundMessageSchema.parse({

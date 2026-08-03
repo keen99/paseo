@@ -120,6 +120,7 @@ import {
   listImportableProviderSessions,
   normalizeImportAgentRequest,
 } from "./agent/import-sessions.js";
+import { updatePaseoMetaSidecar } from "./agent/providers/pi/session-discovery.js";
 import {
   checkoutLiteFromGitSnapshot,
   checkoutFromPersistedWorkspacePlacement,
@@ -1970,6 +1971,8 @@ export class Session {
         return this.agentConfigSession.handleSetAgentFeatureRequest(msg);
       case "set_agent_thinking_request":
         return this.agentConfigSession.handleSetAgentThinkingRequest(msg);
+      case "update_provider_session_meta_request":
+        return this.handleUpdateProviderSessionMeta(msg);
       case "get_daemon_config_request":
         this.emit({
           type: "get_daemon_config_response",
@@ -4938,6 +4941,38 @@ export class Session {
           requestType: request.type,
           error: message,
           code,
+        },
+      });
+    }
+  }
+
+  private async handleUpdateProviderSessionMeta(
+    request: Extract<SessionInboundMessage, { type: "update_provider_session_meta_request" }>,
+  ): Promise<void> {
+    try {
+      if (request.provider !== "pi") {
+        throw new Error(`Metadata update not supported for provider: ${request.provider}`);
+      }
+      const meta = await updatePaseoMetaSidecar(request.providerHandleId, request.meta);
+      this.emit({
+        type: "update_provider_session_meta_response",
+        payload: {
+          requestId: request.requestId,
+          provider: request.provider,
+          providerHandleId: request.providerHandleId,
+          meta,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update session metadata";
+      this.sessionLogger.error({ err: error }, "Failed to handle update_provider_session_meta");
+      this.emit({
+        type: "rpc_error",
+        payload: {
+          requestId: request.requestId,
+          requestType: request.type,
+          error: message,
+          code: "update_provider_session_meta_failed",
         },
       });
     }

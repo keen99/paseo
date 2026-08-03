@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import type { Logger } from "pino";
 
@@ -136,3 +136,31 @@ export async function readPaseoMetaSidecar(sessionFile: string): Promise<PiSessi
 }
 
 export { readPiImportSessionConfig, META_SUFFIX };
+
+/**
+ * Merge sparse updates into the paseo-meta sidecar for a pi session.
+ * null = clear field. undefined = leave unchanged.
+ * Creates the sidecar if none exists.
+ */
+export async function updatePaseoMetaSidecar(
+  sessionFile: string,
+  patch: {
+    displayName?: string | null;
+    pinned?: boolean | null;
+    folder?: string | null;
+  },
+): Promise<PiSessionPaseoMeta> {
+  const sidecarPath = sessionFile.replace(/\.jsonl$/i, META_SUFFIX);
+  const current = await readPaseoMetaSidecar(sessionFile);
+  const merged: PiSessionPaseoMeta = { ...current };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null || value === undefined) {
+      delete (merged as Record<string, unknown>)[key];
+    } else {
+      (merged as Record<string, unknown>)[key] = value;
+    }
+  }
+  await mkdir(path.dirname(sidecarPath), { recursive: true });
+  await writeFile(sidecarPath, JSON.stringify(merged, null, 2) + "\n", "utf8");
+  return merged;
+}
