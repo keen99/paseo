@@ -2134,6 +2134,40 @@ export class DaemonClient {
     });
   }
 
+  async launchHeadlessProviderSession(input: {
+    provider: string;
+    providerHandleId: string;
+    cwd: string;
+    requestId?: string;
+  }): Promise<
+    Extract<
+      SessionOutboundMessage,
+      { type: "launch_headless_provider_session_response" }
+    >["payload"]
+  > {
+    const resolvedRequestId = this.createRequestId(input.requestId);
+    const message = SessionInboundMessageSchema.parse({
+      type: "launch_headless_provider_session_request",
+      requestId: resolvedRequestId,
+      provider: input.provider,
+      providerHandleId: input.providerHandleId,
+      cwd: input.cwd,
+    });
+    return this.sendRequest({
+      requestId: resolvedRequestId,
+      message,
+      select: (msg) => {
+        if (msg.type !== "launch_headless_provider_session_response") {
+          return null;
+        }
+        if (msg.payload.requestId !== resolvedRequestId) {
+          return null;
+        }
+        return msg.payload;
+      },
+    });
+  }
+
   async fetchWorkspaces(options?: FetchWorkspacesOptions): Promise<FetchWorkspacesPayload> {
     const resolvedRequestId = this.createRequestId(options?.requestId);
     const message = SessionInboundMessageSchema.parse({

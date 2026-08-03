@@ -338,6 +338,9 @@ export const ar: TranslationResources = {
       importing: "جارٍ الاستيراد...",
       fork: "Fork session",
       rename: "Rename session",
+      launch: "Launch headless",
+      launchTitle: "Launch headless session",
+      launchBody: "Run this in your shell to start a headless pi:",
     },
   },
   workspace: {

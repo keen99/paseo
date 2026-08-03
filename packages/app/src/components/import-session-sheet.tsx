@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, type PressableStateCallbackType, Text, View } from "react-native";
+import { Alert, Pressable, type PressableStateCallbackType, Text, View } from "react-native";
 import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type {
@@ -42,6 +42,7 @@ export type RecentProviderSessionsClient = Pick<
   | "importAgent"
   | "updateProviderSessionMeta"
   | "forkProviderSession"
+  | "launchHeadlessProviderSession"
 > &
   Partial<Pick<DaemonClient, "attachLiveAgent">>;
 
@@ -204,6 +205,7 @@ function ImportSessionSheetRow({
   onTogglePin,
   onFork,
   onRename,
+  onLaunch,
 }: {
   entry: FetchRecentProviderSessionEntry;
   disabled: boolean;
@@ -213,6 +215,7 @@ function ImportSessionSheetRow({
   onTogglePin?: (entry: FetchRecentProviderSessionEntry) => void;
   onFork?: (entry: FetchRecentProviderSessionEntry) => void;
   onRename?: (entry: FetchRecentProviderSessionEntry) => void;
+  onLaunch?: (entry: FetchRecentProviderSessionEntry) => void;
 }) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
@@ -236,6 +239,9 @@ function ImportSessionSheetRow({
   const handleRename = useCallback(() => {
     if (onRename) onRename(entry);
   }, [entry, onRename]);
+  const handleLaunch = useCallback(() => {
+    if (onLaunch) onLaunch(entry);
+  }, [entry, onLaunch]);
   const pressableStyle = useCallback(
     ({ pressed, hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.row,
@@ -296,6 +302,18 @@ function ImportSessionSheetRow({
               testID={`import-session-rename-${entry.providerId}-${entry.providerHandleId}`}
             >
               <Text style={styles.renameAction}>✎</Text>
+            </Pressable>
+          ) : null}
+          {onLaunch ? (
+            <Pressable
+              onPress={handleLaunch}
+              disabled={disabled}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t("importSession.row.launch")}
+              testID={`import-session-launch-${entry.providerId}-${entry.providerHandleId}`}
+            >
+              <Text style={styles.launchAction}>▶</Text>
             </Pressable>
           ) : null}
           <Text style={styles.rowMeta}>
@@ -545,11 +563,37 @@ export function ImportSessionSheet({
     },
   });
 
+  const launchMutation = useMutation({
+    mutationFn: async (entry: FetchRecentProviderSessionEntry) => {
+      if (!client?.launchHeadlessProviderSession) {
+        throw new Error(t("workspace.terminal.hostDisconnected"));
+      }
+      return client.launchHeadlessProviderSession({
+        provider: entry.providerId,
+        providerHandleId: entry.providerHandleId,
+        cwd: entry.cwd,
+      });
+    },
+    onSuccess: (payload) => {
+      Alert.alert(
+        t("importSession.row.launchTitle"),
+        `${t("importSession.row.launchBody")}\n\ncd ${payload.cwd}\n${payload.resumeCommand}`,
+      );
+    },
+  });
+
   const handleFork = useCallback(
     (entry: FetchRecentProviderSessionEntry) => {
       forkMutation.mutate(entry);
     },
     [forkMutation],
+  );
+
+  const handleLaunch = useCallback(
+    (entry: FetchRecentProviderSessionEntry) => {
+      launchMutation.mutate(entry);
+    },
+    [launchMutation],
   );
 
   const [renamingEntry, setRenamingEntry] = useState<FetchRecentProviderSessionEntry | null>(null);
@@ -697,6 +741,7 @@ export function ImportSessionSheet({
               onTogglePin={handleTogglePin}
               onFork={handleFork}
               onRename={handleRename}
+              onLaunch={handleLaunch}
             />
           ))}
         </View>
@@ -811,6 +856,11 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing[1],
   },
   renameAction: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.base,
+    paddingHorizontal: theme.spacing[1],
+  },
+  launchAction: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
     paddingHorizontal: theme.spacing[1],

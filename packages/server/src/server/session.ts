@@ -120,7 +120,11 @@ import {
   listImportableProviderSessions,
   normalizeImportAgentRequest,
 } from "./agent/import-sessions.js";
-import { updatePaseoMetaSidecar, forkPiSession } from "./agent/providers/pi/session-discovery.js";
+import {
+  updatePaseoMetaSidecar,
+  forkPiSession,
+  parseSessionIdFromHandle,
+} from "./agent/providers/pi/session-discovery.js";
 import {
   checkoutLiteFromGitSnapshot,
   checkoutFromPersistedWorkspacePlacement,
@@ -1975,6 +1979,8 @@ export class Session {
         return this.handleUpdateProviderSessionMeta(msg);
       case "fork_provider_session_request":
         return this.handleForkProviderSession(msg);
+      case "launch_headless_provider_session_request":
+        return this.handleLaunchHeadlessProviderSession(msg);
       case "get_daemon_config_request":
         this.emit({
           type: "get_daemon_config_response",
@@ -5008,6 +5014,40 @@ export class Session {
           requestType: request.type,
           error: message,
           code: "fork_provider_session_failed",
+        },
+      });
+    }
+  }
+
+  private async handleLaunchHeadlessProviderSession(
+    request: Extract<SessionInboundMessage, { type: "launch_headless_provider_session_request" }>,
+  ): Promise<void> {
+    try {
+      if (request.provider !== "pi") {
+        throw new Error(`Launch not supported for provider: ${request.provider}`);
+      }
+      const sessionId = parseSessionIdFromHandle(request.providerHandleId);
+      // Explicit user action: never auto-spawn. Return the resume command for
+      // the user to run in their own shell. Paseo never owns the pi process.
+      const resumeCommand = `pi --resume ${sessionId}`;
+      this.emit({
+        type: "launch_headless_provider_session_response",
+        payload: {
+          requestId: request.requestId,
+          resumeCommand,
+          cwd: request.cwd,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to build resume command";
+      this.sessionLogger.error({ err: error }, "Failed to handle launch_headless_provider_session");
+      this.emit({
+        type: "rpc_error",
+        payload: {
+          requestId: request.requestId,
+          requestType: request.type,
+          error: message,
+          code: "launch_headless_provider_session_failed",
         },
       });
     }

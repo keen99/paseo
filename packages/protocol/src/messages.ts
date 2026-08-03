@@ -1188,6 +1188,26 @@ export const ForkProviderSessionResponseMessageSchema = z.object({
   }),
 });
 
+// Launch a headless pi process resuming a session, then attach.
+// Explicit user action; bypasses the never-spawn guard.
+export const LaunchHeadlessProviderSessionRequestMessageSchema = z.object({
+  type: z.literal("launch_headless_provider_session_request"),
+  requestId: z.string(),
+  provider: z.string(),
+  providerHandleId: z.string(),
+  cwd: z.string(),
+});
+
+export const LaunchHeadlessProviderSessionResponseMessageSchema = z.object({
+  type: z.literal("launch_headless_provider_session_response"),
+  payload: z.object({
+    requestId: z.string(),
+    /** pi --resume command for the user to run in their own shell. */
+    resumeCommand: z.string(),
+    cwd: z.string(),
+  }),
+});
+
 export const FetchAgentRequestMessageSchema = z.object({
   type: z.literal("fetch_agent_request"),
   requestId: z.string(),
@@ -2544,6 +2564,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   FetchRecentProviderSessionsRequestMessageSchema,
   UpdateProviderSessionMetaRequestMessageSchema,
   ForkProviderSessionRequestMessageSchema,
+  LaunchHeadlessProviderSessionRequestMessageSchema,
   FetchWorkspacesRequestMessageSchema,
   ProjectListRequestMessageSchema,
   FetchAgentRequestMessageSchema,
@@ -5310,6 +5331,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   FetchRecentProviderSessionsResponseMessageSchema,
   UpdateProviderSessionMetaResponseMessageSchema,
   ForkProviderSessionResponseMessageSchema,
+  LaunchHeadlessProviderSessionResponseMessageSchema,
   FetchWorkspacesResponseMessageSchema,
   ProjectAddResponseSchema,
   ProjectCreateDirectoryResponseSchema,

@@ -338,6 +338,9 @@ export const zhCN: TranslationResources = {
       importing: "正在导入...",
       fork: "Fork session",
       rename: "Rename session",
+      launch: "Launch headless",
+      launchTitle: "Launch headless session",
+      launchBody: "Run this in your shell to start a headless pi:",
     },
   },
   workspace: {
