@@ -197,12 +197,14 @@ function ImportSessionSheetRow({
   importing,
   showCwd,
   onImportSession,
+  onTogglePin,
 }: {
   entry: FetchRecentProviderSessionEntry;
   disabled: boolean;
   importing: boolean;
   showCwd: boolean;
   onImportSession: (entry: FetchRecentProviderSessionEntry) => void;
+  onTogglePin?: (entry: FetchRecentProviderSessionEntry) => void;
 }) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
@@ -217,6 +219,9 @@ function ImportSessionSheetRow({
   const handlePress = useCallback(() => {
     onImportSession(entry);
   }, [entry, onImportSession]);
+  const handleLongPress = useCallback(() => {
+    if (onTogglePin) onTogglePin(entry);
+  }, [entry, onTogglePin]);
   const pressableStyle = useCallback(
     ({ pressed, hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.row,
@@ -230,6 +235,7 @@ function ImportSessionSheetRow({
     <Pressable
       disabled={disabled}
       onPress={handlePress}
+      onLongPress={handleLongPress}
       accessibilityRole="button"
       accessibilityState={accessibilityState}
       style={pressableStyle}
@@ -243,6 +249,7 @@ function ImportSessionSheetRow({
           <Text style={styles.rowTitle} numberOfLines={1}>
             {title}
           </Text>
+          {entry.meta?.pinned ? <Text style={styles.pinIndicator}>★</Text> : null}
           {PI_LIVE_UI && (entry.isLive || entry.isLiveAttachable) ? (
             <View style={styles.liveBadge}>
               <Text style={styles.liveBadgeText}>LIVE</Text>
@@ -462,6 +469,29 @@ export function ImportSessionSheet({
     [importMutation],
   );
 
+  const pinMutation = useMutation({
+    mutationFn: async (input: { entry: FetchRecentProviderSessionEntry; pinned: boolean }) => {
+      if (!client?.updateProviderSessionMeta) {
+        throw new Error(t("workspace.terminal.hostDisconnected"));
+      }
+      return client.updateProviderSessionMeta({
+        provider: input.entry.providerId,
+        providerHandleId: input.entry.providerHandleId,
+        meta: { pinned: input.pinned },
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: sessionsQueryRoot });
+    },
+  });
+
+  const handleTogglePin = useCallback(
+    (entry: FetchRecentProviderSessionEntry) => {
+      pinMutation.mutate({ entry, pinned: !entry.meta?.pinned });
+    },
+    [pinMutation],
+  );
+
   const erroredProviderLabels = useMemo(
     () => collectErroredProviderLabels(providersToFetch, queries, providerLabelById),
     [queries, providersToFetch, providerLabelById],
@@ -570,6 +600,7 @@ export function ImportSessionSheet({
               importing={importingSessionKey === `${entry.providerId}:${entry.providerHandleId}`}
               showCwd={!cwd}
               onImportSession={handleImportSession}
+              onTogglePin={handleTogglePin}
             />
           ))}
         </View>
@@ -664,6 +695,11 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.xs,
     fontWeight: theme.fontWeight.bold,
     letterSpacing: 0.5,
+  },
+  pinIndicator: {
+    color: theme.colors.statusWarning,
+    fontSize: theme.fontSize.base,
+    marginLeft: theme.spacing[1],
   },
   rowTitle: {
     flex: 1,
