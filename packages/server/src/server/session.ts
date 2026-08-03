@@ -120,7 +120,7 @@ import {
   listImportableProviderSessions,
   normalizeImportAgentRequest,
 } from "./agent/import-sessions.js";
-import { updatePaseoMetaSidecar } from "./agent/providers/pi/session-discovery.js";
+import { updatePaseoMetaSidecar, forkPiSession } from "./agent/providers/pi/session-discovery.js";
 import {
   checkoutLiteFromGitSnapshot,
   checkoutFromPersistedWorkspacePlacement,
@@ -1973,6 +1973,8 @@ export class Session {
         return this.agentConfigSession.handleSetAgentThinkingRequest(msg);
       case "update_provider_session_meta_request":
         return this.handleUpdateProviderSessionMeta(msg);
+      case "fork_provider_session_request":
+        return this.handleForkProviderSession(msg);
       case "get_daemon_config_request":
         this.emit({
           type: "get_daemon_config_response",
@@ -4973,6 +4975,39 @@ export class Session {
           requestType: request.type,
           error: message,
           code: "update_provider_session_meta_failed",
+        },
+      });
+    }
+  }
+
+  private async handleForkProviderSession(
+    request: Extract<SessionInboundMessage, { type: "fork_provider_session_request" }>,
+  ): Promise<void> {
+    try {
+      if (request.provider !== "pi") {
+        throw new Error(`Fork not supported for provider: ${request.provider}`);
+      }
+      const result = await forkPiSession(request.providerHandleId);
+      this.emit({
+        type: "fork_provider_session_response",
+        payload: {
+          requestId: request.requestId,
+          provider: request.provider,
+          providerHandleId: result.sessionFile,
+          forkedSessionId: result.sessionId,
+          forkedSessionFile: result.sessionFile,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to fork provider session";
+      this.sessionLogger.error({ err: error }, "Failed to handle fork_provider_session");
+      this.emit({
+        type: "rpc_error",
+        payload: {
+          requestId: request.requestId,
+          requestType: request.type,
+          error: message,
+          code: "fork_provider_session_failed",
         },
       });
     }

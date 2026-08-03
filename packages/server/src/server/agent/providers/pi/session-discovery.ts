@@ -1,4 +1,5 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { copyFile, readFile, writeFile, mkdir } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import type { Logger } from "pino";
 
@@ -163,4 +164,38 @@ export async function updatePaseoMetaSidecar(
   await mkdir(path.dirname(sidecarPath), { recursive: true });
   await writeFile(sidecarPath, JSON.stringify(merged, null, 2) + "\n", "utf8");
   return merged;
+}
+
+/**
+ * Fork a pi session: copy jsonl to new pi session file (new uuid), write
+ * paseo-meta sidecar marking origin. Original untouched.
+ *
+ * Filename pattern: <timestamp>_<uuid>.jsonl, matching pi's own layout,
+ * so `pi --resume` discovers the fork.
+ */
+export async function forkPiSession(sourceSessionFile: string): Promise<{
+  sessionFile: string;
+  sessionId: string;
+}> {
+  const dir = path.dirname(sourceSessionFile);
+  const newId = randomUUID();
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const newFile = path.join(dir, `${stamp}_${newId}.jsonl`);
+  await copyFile(sourceSessionFile, newFile);
+  await updatePaseoMetaSidecar(newFile, {});
+  // Overwrite sidecar with fork lineage.
+  const sidecarPath = newFile.replace(/\.jsonl$/i, META_SUFFIX);
+  await writeFile(
+    sidecarPath,
+    JSON.stringify(
+      {
+        forkedFrom: parseSessionIdFromHandle(sourceSessionFile),
+        forkedAt: new Date().toISOString(),
+      },
+      null,
+      2,
+    ) + "\n",
+    "utf8",
+  );
+  return { sessionFile: newFile, sessionId: newId };
 }

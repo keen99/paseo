@@ -37,7 +37,10 @@ const DISABLED_ACCESSIBILITY_STATE = { disabled: true };
 
 export type RecentProviderSessionsClient = Pick<
   DaemonClient,
-  "fetchRecentProviderSessions" | "importAgent" | "updateProviderSessionMeta"
+  | "fetchRecentProviderSessions"
+  | "importAgent"
+  | "updateProviderSessionMeta"
+  | "forkProviderSession"
 > &
   Partial<Pick<DaemonClient, "attachLiveAgent">>;
 
@@ -198,6 +201,7 @@ function ImportSessionSheetRow({
   showCwd,
   onImportSession,
   onTogglePin,
+  onFork,
 }: {
   entry: FetchRecentProviderSessionEntry;
   disabled: boolean;
@@ -205,6 +209,7 @@ function ImportSessionSheetRow({
   showCwd: boolean;
   onImportSession: (entry: FetchRecentProviderSessionEntry) => void;
   onTogglePin?: (entry: FetchRecentProviderSessionEntry) => void;
+  onFork?: (entry: FetchRecentProviderSessionEntry) => void;
 }) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
@@ -222,6 +227,9 @@ function ImportSessionSheetRow({
   const handleLongPress = useCallback(() => {
     if (onTogglePin) onTogglePin(entry);
   }, [entry, onTogglePin]);
+  const handleFork = useCallback(() => {
+    if (onFork) onFork(entry);
+  }, [entry, onFork]);
   const pressableStyle = useCallback(
     ({ pressed, hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.row,
@@ -259,6 +267,18 @@ function ImportSessionSheetRow({
             <View style={styles.forkBadge}>
               <Text style={styles.forkBadgeText}>FORK</Text>
             </View>
+          ) : null}
+          {onFork ? (
+            <Pressable
+              onPress={handleFork}
+              disabled={disabled}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t("importSession.row.fork")}
+              testID={`import-session-fork-${entry.providerId}-${entry.providerHandleId}`}
+            >
+              <Text style={styles.forkAction}>⎋</Text>
+            </Pressable>
           ) : null}
           <Text style={styles.rowMeta}>
             {importing ? t("importSession.row.importing") : lastActivity}
@@ -492,6 +512,28 @@ export function ImportSessionSheet({
     [pinMutation],
   );
 
+  const forkMutation = useMutation({
+    mutationFn: async (entry: FetchRecentProviderSessionEntry) => {
+      if (!client?.forkProviderSession) {
+        throw new Error(t("workspace.terminal.hostDisconnected"));
+      }
+      return client.forkProviderSession({
+        provider: entry.providerId,
+        providerHandleId: entry.providerHandleId,
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: sessionsQueryRoot });
+    },
+  });
+
+  const handleFork = useCallback(
+    (entry: FetchRecentProviderSessionEntry) => {
+      forkMutation.mutate(entry);
+    },
+    [forkMutation],
+  );
+
   const erroredProviderLabels = useMemo(
     () => collectErroredProviderLabels(providersToFetch, queries, providerLabelById),
     [queries, providersToFetch, providerLabelById],
@@ -601,6 +643,7 @@ export function ImportSessionSheet({
               showCwd={!cwd}
               onImportSession={handleImportSession}
               onTogglePin={handleTogglePin}
+              onFork={handleFork}
             />
           ))}
         </View>
@@ -700,6 +743,11 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.statusWarning,
     fontSize: theme.fontSize.base,
     marginLeft: theme.spacing[1],
+  },
+  forkAction: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.base,
+    paddingHorizontal: theme.spacing[1],
   },
   rowTitle: {
     flex: 1,

@@ -339,6 +339,7 @@ export const es: TranslationResources = {
     },
     row: {
       importing: "Importador...",
+      fork: "Fork session",
     },
   },
   workspace: {

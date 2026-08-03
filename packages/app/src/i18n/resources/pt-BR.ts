@@ -339,6 +339,7 @@ export const ptBR: TranslationResources = {
     },
     row: {
       importing: "Importando...",
+      fork: "Fork session",
     },
   },
   workspace: {

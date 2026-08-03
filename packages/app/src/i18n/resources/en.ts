@@ -335,6 +335,7 @@ export const en = {
     },
     row: {
       importing: "Importing...",
+      fork: "Fork session",
     },
   },
   workspace: {

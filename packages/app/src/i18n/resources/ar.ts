@@ -336,6 +336,7 @@ export const ar: TranslationResources = {
     },
     row: {
       importing: "جارٍ الاستيراد...",
+      fork: "Fork session",
     },
   },
   workspace: {

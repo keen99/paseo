@@ -219,6 +219,7 @@ function createRecentSessionsClient(
     fetchRecentProviderSessions,
     importAgent,
     updateProviderSessionMeta: vi.fn(),
+    forkProviderSession: vi.fn(),
   };
 }
 

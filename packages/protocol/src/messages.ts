@@ -1169,6 +1169,25 @@ export const UpdateProviderSessionMetaResponseMessageSchema = z.object({
   }),
 });
 
+// Fork a provider session: copy into a new session, track lineage.
+export const ForkProviderSessionRequestMessageSchema = z.object({
+  type: z.literal("fork_provider_session_request"),
+  requestId: z.string(),
+  provider: z.string(),
+  providerHandleId: z.string(),
+});
+
+export const ForkProviderSessionResponseMessageSchema = z.object({
+  type: z.literal("fork_provider_session_response"),
+  payload: z.object({
+    requestId: z.string(),
+    provider: z.string(),
+    providerHandleId: z.string(),
+    forkedSessionId: z.string(),
+    forkedSessionFile: z.string(),
+  }),
+});
+
 export const FetchAgentRequestMessageSchema = z.object({
   type: z.literal("fetch_agent_request"),
   requestId: z.string(),
@@ -2524,6 +2543,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   FetchAgentHistoryRequestMessageSchema,
   FetchRecentProviderSessionsRequestMessageSchema,
   UpdateProviderSessionMetaRequestMessageSchema,
+  ForkProviderSessionRequestMessageSchema,
   FetchWorkspacesRequestMessageSchema,
   ProjectListRequestMessageSchema,
   FetchAgentRequestMessageSchema,
@@ -5289,6 +5309,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   FetchAgentHistoryResponseMessageSchema,
   FetchRecentProviderSessionsResponseMessageSchema,
   UpdateProviderSessionMetaResponseMessageSchema,
+  ForkProviderSessionResponseMessageSchema,
   FetchWorkspacesResponseMessageSchema,
   ProjectAddResponseSchema,
   ProjectCreateDirectoryResponseSchema,
