@@ -31,6 +31,7 @@ interface ProjectionOptions {
 interface RecentProviderSessionProjectionOptions {
   providerLabel: string;
   isLiveAttachable?: boolean;
+  isLive?: boolean;
 }
 
 function normalizeThinkingOptionId(value: string | null | undefined): string | null {
@@ -270,7 +271,17 @@ export function toAgentListItemPayload(agent: AgentSnapshotPayload): AgentListIt
 }
 
 export function toRecentProviderSessionDescriptorPayload(
-  session: ImportableProviderSession & { provider: string },
+  session: ImportableProviderSession & {
+    provider: string;
+    sessionId?: string;
+    meta?: {
+      displayName?: string;
+      pinned?: boolean;
+      folder?: string;
+      forkedFrom?: string;
+      forkedAt?: string;
+    };
+  },
   options: RecentProviderSessionProjectionOptions,
 ): RecentProviderSessionDescriptorPayload {
   return {
@@ -283,6 +294,9 @@ export function toRecentProviderSessionDescriptorPayload(
     lastPromptPreview: session.lastPromptPreview,
     lastActivityAt: session.lastActivityAt.toISOString(),
     ...(options.isLiveAttachable ? { isLiveAttachable: true } : {}),
+    ...(session.sessionId ? { sessionId: session.sessionId } : {}),
+    ...(session.meta ? { meta: session.meta } : {}),
+    ...(options.isLive ? { isLive: true } : {}),
   };
 }
 

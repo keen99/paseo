@@ -169,12 +169,25 @@ export async function listImportableProviderSessions(
   const ranked = candidates.sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime());
   const top = ranked.slice(0, limit);
   const livePiSessionFiles = await probeLivePiSessionFiles();
+  // Probe live bridge state for pi sessions (unified discovery).
+  const piTopSessions = top.filter((s) => s.provider === "pi");
+  const livePiSessionIds = new Set<string>();
+  if (piTopSessions.some((s) => s.sessionId)) {
+    const bridges = await discoverLivePiBridges();
+    for (const b of bridges) {
+      if (b.sessionId) livePiSessionIds.add(b.sessionId);
+    }
+  }
   const entries = top.map((descriptor) =>
     toRecentProviderSessionDescriptorPayload(descriptor, {
       providerLabel: providerSnapshotManager.getProviderLabel(descriptor.provider),
       isLiveAttachable:
         descriptor.provider === "pi" &&
         livePiSessionFiles.has(resolvePath(descriptor.providerHandleId)),
+      isLive:
+        descriptor.provider === "pi" &&
+        !!descriptor.sessionId &&
+        livePiSessionIds.has(descriptor.sessionId),
     }),
   );
 

@@ -65,9 +65,12 @@ export function aggregateSessionEntries(
       collected.push(entry);
     }
   }
-  collected.sort(
-    (a, b) => new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime(),
-  );
+  collected.sort((a, b) => {
+    const aPinned = a.meta?.pinned === true ? 1 : 0;
+    const bPinned = b.meta?.pinned === true ? 1 : 0;
+    if (aPinned !== bPinned) return bPinned - aPinned;
+    return new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime();
+  });
   return collected;
 }
 
@@ -98,6 +101,10 @@ export function collectErroredProviderLabels(
 }
 
 export function getSessionTitle(entry: FetchRecentProviderSessionEntry): string {
+  const metaName = entry.meta?.displayName?.trim();
+  if (metaName) {
+    return metaName;
+  }
   const title = entry.title?.trim();
   if (title) {
     return title;

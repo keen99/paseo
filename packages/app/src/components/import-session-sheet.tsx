@@ -243,9 +243,14 @@ function ImportSessionSheetRow({
           <Text style={styles.rowTitle} numberOfLines={1}>
             {title}
           </Text>
-          {PI_LIVE_UI && entry.isLiveAttachable ? (
+          {PI_LIVE_UI && (entry.isLive || entry.isLiveAttachable) ? (
             <View style={styles.liveBadge}>
               <Text style={styles.liveBadgeText}>LIVE</Text>
+            </View>
+          ) : null}
+          {entry.meta?.forkedFrom ? (
+            <View style={styles.forkBadge}>
+              <Text style={styles.forkBadgeText}>FORK</Text>
             </View>
           ) : null}
           <Text style={styles.rowMeta}>
@@ -643,6 +648,18 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.accent,
   },
   liveBadgeText: {
+    color: theme.colors.surface0,
+    fontSize: theme.fontSize.xs,
+    fontWeight: theme.fontWeight.bold,
+    letterSpacing: 0.5,
+  },
+  forkBadge: {
+    paddingHorizontal: theme.spacing[1.5],
+    paddingVertical: 2,
+    borderRadius: theme.borderRadius.sm,
+    backgroundColor: theme.colors.foregroundMuted,
+  },
+  forkBadgeText: {
     color: theme.colors.surface0,
     fontSize: theme.fontSize.xs,
     fontWeight: theme.fontWeight.bold,

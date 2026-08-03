@@ -63,7 +63,8 @@ import {
 import { materializeProviderImage } from "../provider-image-output.js";
 import { PiCliRuntime } from "./cli-runtime.js";
 import { revertPiConversation } from "./rewind.js";
-import { listPiImportableSessions, readPiImportSessionConfig } from "./session-descriptor.js";
+import { listDiscoveredPiSessions, type PiSessionPaseoMeta } from "./session-discovery.js";
+import { readPiImportSessionConfig } from "./session-descriptor.js";
 import { PiBridgeAttachSession, discoverLivePiBridges } from "./bridge-attach.js";
 import type { PiRuntime, PiRuntimeSession } from "./runtime.js";
 import type {
@@ -2515,10 +2516,26 @@ export class PiRpcAgentClient implements AgentClient {
   async listImportableSessions(
     options?: ListImportableSessionsOptions,
   ): Promise<ImportableProviderSession[]> {
-    return await listPiImportableSessions({
-      ...options,
-      sessionDir: this.providerParams.sessionDir,
-      runtimeSettings: this.runtimeSettings,
+    const discovered = await listDiscoveredPiSessions({
+      ...(options?.cwd ? { cwd: options.cwd } : {}),
+      limit: options?.limit,
+    });
+    return discovered.map((d): ImportableProviderSession => {
+      const out = {
+        providerHandleId: d.providerHandleId,
+        cwd: d.cwd,
+        title: d.title,
+        firstPromptPreview: d.firstPromptPreview,
+        lastPromptPreview: d.lastPromptPreview,
+        lastActivityAt: d.lastActivityAt,
+      } as ImportableProviderSession & {
+        sessionId?: string;
+        meta?: PiSessionPaseoMeta;
+      };
+      if (d.isLiveAttachable) out.isLiveAttachable = true;
+      if (d.sessionId) out.sessionId = d.sessionId;
+      if (d.meta && Object.keys(d.meta).length > 0) out.meta = d.meta;
+      return out;
     });
   }
 

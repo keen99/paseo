@@ -199,6 +199,16 @@ export type ImportablePersistedAgentQueryOptions = ListImportableSessionsOptions
 
 export interface ManagedImportableProviderSession extends ImportableProviderSession {
   provider: AgentProvider;
+  /** Pi session id parsed from jsonl filename. Unified discovery only. */
+  sessionId?: string;
+  /** Paseo overlay metadata sidecar (sparse). Unified discovery only. */
+  meta?: {
+    displayName?: string;
+    pinned?: boolean;
+    folder?: string;
+    forkedFrom?: string;
+    forkedAt?: string;
+  };
 }
 
 export type AgentAttentionCallback = (params: {

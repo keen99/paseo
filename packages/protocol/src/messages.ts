@@ -758,6 +758,20 @@ export const RecentProviderSessionDescriptorPayloadSchema = z.object({
   lastPromptPreview: z.string().nullable(),
   lastActivityAt: z.string(),
   isLiveAttachable: z.boolean().optional(),
+  // Unified discovery (pi-live-share): pi session id parsed from jsonl filename.
+  sessionId: z.string().optional(),
+  // Paseo overlay metadata sidecar (sparse). Empty object if none.
+  meta: z
+    .object({
+      displayName: z.string().optional(),
+      pinned: z.boolean().optional(),
+      folder: z.string().optional(),
+      forkedFrom: z.string().optional(),
+      forkedAt: z.string().optional(),
+    })
+    .optional(),
+  // Live head detected via bridge probe. Caller-scope; refreshed per active view.
+  isLive: z.boolean().optional(),
 });
 
 export type RecentProviderSessionDescriptorPayload = z.infer<
