@@ -1838,19 +1838,21 @@ function PiSessionDiscoverySection({ serverId }: { serverId: string }) {
   if (!isConnected) return null;
 
   return (
-    <SettingsSection title={t("settings.piSessionDiscovery.title")}>
+    <SettingsSection title={t("settings.host.piSessionDiscovery.title")}>
       <View style={settingsStyles.card} testID="host-page-pi-session-discovery-card">
         <View style={settingsStyles.row}>
           <View style={settingsStyles.rowContent}>
             <Text style={settingsStyles.rowTitle}>
-              {t("settings.piSessionDiscovery.scanTitle")}
+              {t("settings.host.piSessionDiscovery.scanTitle")}
             </Text>
-            <Text style={settingsStyles.rowHint}>{t("settings.piSessionDiscovery.scanHint")}</Text>
+            <Text style={settingsStyles.rowHint}>
+              {t("settings.host.piSessionDiscovery.scanHint")}
+            </Text>
           </View>
           <Switch
             value={config?.piSessionDiscovery?.scanEnabled === true}
             onValueChange={handleScanToggle}
-            accessibilityLabel={t("settings.piSessionDiscovery.scanTitle")}
+            accessibilityLabel={t("settings.host.piSessionDiscovery.scanTitle")}
             testID="host-page-pi-session-discovery-switch"
           />
         </View>

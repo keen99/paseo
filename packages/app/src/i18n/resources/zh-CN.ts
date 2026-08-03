@@ -1090,12 +1090,6 @@ export const zhCN: TranslationResources = {
     settings: {
       loadFailed: "无法加载桌面设置。",
       saveFailed: "无法保存桌面设置。",
-      piSessionDiscovery: {
-        title: "Pi session discovery",
-        scanTitle: "Auto-discover all sessions",
-        scanHint:
-          "Show every pi session (all directories) in the session list, not just the current workspace.",
-      },
     },
     rosetta: {
       title: "下载 Apple Silicon 构建",
@@ -1905,6 +1899,12 @@ export const zhCN: TranslationResources = {
         title: "配对设备",
         rowTitle: "配对设备",
         rowHint: "扫描二维码或复制链接，将手机连接到这个 Host",
+      },
+      piSessionDiscovery: {
+        title: "Pi session discovery",
+        scanTitle: "Auto-discover all sessions",
+        scanHint:
+          "Show every pi session (all directories) in the session list, not just the current workspace.",
       },
       orchestration: {
         title: "编排",

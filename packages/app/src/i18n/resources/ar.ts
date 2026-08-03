@@ -1103,12 +1103,6 @@ export const ar: TranslationResources = {
     settings: {
       loadFailed: "غير قادر على تحميل إعدادات سطح المكتب.",
       saveFailed: "غير قادر على حفظ إعدادات سطح المكتب.",
-      piSessionDiscovery: {
-        title: "Pi session discovery",
-        scanTitle: "Auto-discover all sessions",
-        scanHint:
-          "Show every pi session (all directories) in the session list, not just the current workspace.",
-      },
     },
     rosetta: {
       title: "قم بتنزيل نسخة Apple Silicon",
@@ -1926,6 +1920,12 @@ export const ar: TranslationResources = {
         title: "إقران الأجهزة",
         rowTitle: "إقران جهاز",
         rowHint: "امسح رمز QR ضوئيًا أو انسخ رابطًا لتوصيل هاتفك بهذا المضيف",
+      },
+      piSessionDiscovery: {
+        title: "Pi session discovery",
+        scanTitle: "Auto-discover all sessions",
+        scanHint:
+          "Show every pi session (all directories) in the session list, not just the current workspace.",
       },
       orchestration: {
         title: "التنسيق",

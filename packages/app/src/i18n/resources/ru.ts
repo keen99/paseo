@@ -1129,12 +1129,6 @@ export const ru: TranslationResources = {
     settings: {
       loadFailed: "Невозможно загрузить настройки рабочего стола.",
       saveFailed: "Невозможно сохранить настройки рабочего стола.",
-      piSessionDiscovery: {
-        title: "Pi session discovery",
-        scanTitle: "Auto-discover all sessions",
-        scanHint:
-          "Show every pi session (all directories) in the session list, not just the current workspace.",
-      },
     },
     rosetta: {
       title: "Загрузите сборку Apple Silicon",
@@ -1965,6 +1959,12 @@ export const ru: TranslationResources = {
         rowTitle: "Сопряжение устройства",
         rowHint:
           "Отсканируйте код QR или скопируйте ссылку, чтобы подключить свой телефон к этому хосту.",
+      },
+      piSessionDiscovery: {
+        title: "Pi session discovery",
+        scanTitle: "Auto-discover all sessions",
+        scanHint:
+          "Show every pi session (all directories) in the session list, not just the current workspace.",
       },
       orchestration: {
         title: "оркестровка",

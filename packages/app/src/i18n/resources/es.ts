@@ -1138,12 +1138,6 @@ export const es: TranslationResources = {
     settings: {
       loadFailed: "No se puede cargar la configuración del escritorio.",
       saveFailed: "No se puede guardar la configuración del escritorio.",
-      piSessionDiscovery: {
-        title: "Pi session discovery",
-        scanTitle: "Auto-discover all sessions",
-        scanHint:
-          "Show every pi session (all directories) in the session list, not just the current workspace.",
-      },
     },
     rosetta: {
       title: "Descargue la compilaciónApple Silicon",
@@ -1975,6 +1969,12 @@ export const es: TranslationResources = {
         title: "Emparejar dispositivos",
         rowTitle: "Emparejar un dispositivo",
         rowHint: "Escanee un códigoQRo copie un enlace para conectar su teléfono a este host",
+      },
+      piSessionDiscovery: {
+        title: "Pi session discovery",
+        scanTitle: "Auto-discover all sessions",
+        scanHint:
+          "Show every pi session (all directories) in the session list, not just the current workspace.",
       },
       orchestration: {
         title: "Orquestación",

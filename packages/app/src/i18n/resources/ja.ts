@@ -1116,12 +1116,6 @@ export const ja: TranslationResources = {
     settings: {
       loadFailed: "デスクトップ設定を読み込めません。",
       saveFailed: "デスクトップ設定を保存できません。",
-      piSessionDiscovery: {
-        title: "Pi session discovery",
-        scanTitle: "Auto-discover all sessions",
-        scanHint:
-          "Show every pi session (all directories) in the session list, not just the current workspace.",
-      },
     },
     rosetta: {
       title: "Apple Siliconビルドをダウンロード",
@@ -1944,6 +1938,12 @@ export const ja: TranslationResources = {
         title: "デバイスをペアリング",
         rowTitle: "デバイスをペアリング",
         rowHint: "QRコードをスキャンするかリンクをコピーしてスマートフォンをこのホストに接続",
+      },
+      piSessionDiscovery: {
+        title: "Pi session discovery",
+        scanTitle: "Auto-discover all sessions",
+        scanHint:
+          "Show every pi session (all directories) in the session list, not just the current workspace.",
       },
       orchestration: {
         title: "オーケストレーション",

@@ -1137,12 +1137,6 @@ export const fr: TranslationResources = {
     settings: {
       loadFailed: "Impossible de charger les paramètres du bureau.",
       saveFailed: "Impossible d'enregistrer les paramètres du bureau.",
-      piSessionDiscovery: {
-        title: "Pi session discovery",
-        scanTitle: "Auto-discover all sessions",
-        scanHint:
-          "Show every pi session (all directories) in the session list, not just the current workspace.",
-      },
     },
     rosetta: {
       title: "Téléchargez la versionApple Silicon",
@@ -1978,6 +1972,12 @@ export const fr: TranslationResources = {
         title: "Associer des appareils",
         rowTitle: "Associer un appareil",
         rowHint: "Scannez un codeQRou copiez un lien pour connecter votre téléphone à cet hôte",
+      },
+      piSessionDiscovery: {
+        title: "Pi session discovery",
+        scanTitle: "Auto-discover all sessions",
+        scanHint:
+          "Show every pi session (all directories) in the session list, not just the current workspace.",
       },
       orchestration: {
         title: "Orchestration",

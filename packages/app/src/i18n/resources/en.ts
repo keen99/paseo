@@ -1114,12 +1114,6 @@ export const en = {
     settings: {
       loadFailed: "Unable to load desktop settings.",
       saveFailed: "Unable to save desktop settings.",
-      piSessionDiscovery: {
-        title: "Pi session discovery",
-        scanTitle: "Auto-discover all sessions",
-        scanHint:
-          "Show every pi session (all directories) in the session list, not just the current workspace.",
-      },
     },
     rosetta: {
       title: "Download the Apple Silicon build",
@@ -1937,6 +1931,12 @@ export const en = {
         title: "Pair devices",
         rowTitle: "Pair a device",
         rowHint: "Scan a QR code or copy a link to connect your phone to this host",
+      },
+      piSessionDiscovery: {
+        title: "Pi session discovery",
+        scanTitle: "Auto-discover all sessions",
+        scanHint:
+          "Show every pi session (all directories) in the session list, not just the current workspace.",
       },
       orchestration: {
         title: "Orchestration",
