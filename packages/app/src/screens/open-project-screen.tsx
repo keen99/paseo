@@ -37,6 +37,7 @@ export function OpenProjectScreen() {
   const localServerId = useLocalDaemonServerId();
   const [importServerId, setImportServerId] = useState<string | null>(null);
   const importClient = useHostRuntimeClient(importServerId ?? "");
+  const localClient = useHostRuntimeClient(localServerId ?? "");
   const openImportedProject = useOpenProject(importServerId);
   const [isPairDeviceOpen, setIsPairDeviceOpen] = useState(false);
   const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
@@ -103,7 +104,7 @@ export function OpenProjectScreen() {
           <View style={styles.sessionListWrap}>
             <PiSessionList
               serverId={localServerId}
-              client={importClient}
+              client={localClient}
               scanAll
               onImportedAgent={handleImported}
               testID="open-project-session-list"
