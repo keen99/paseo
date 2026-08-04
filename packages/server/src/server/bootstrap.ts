@@ -138,6 +138,7 @@ import type { PaseoToolRuntimeContext } from "./agent/tools/types.js";
 import { ProviderSnapshotManager } from "./agent/provider-snapshot-manager.js";
 import { bootstrapWorkspaceRegistries } from "./workspace-registry-bootstrap.js";
 import { ensurePiBridgePackageRegistered } from "./agent/providers/pi/ensure-pi-bridge-package.js";
+import { syncPiSessionWorkspaces } from "./agent/providers/pi/pi-session-workspace-sync.js";
 import { WorkspaceReconciliationService } from "./workspace-reconciliation-service.js";
 import { FileBackedProjectRegistry, FileBackedWorkspaceRegistry } from "./workspace-registry.js";
 import { FileBackedChatService } from "./chat/chat-service.js";
@@ -848,6 +849,26 @@ export async function createPaseoDaemon(
     logger.warn({ err: error }, "pi_bridge.ensure_failed");
   });
   logger.info({ elapsed: elapsed() }, "Pi bridge package ensured");
+  if (daemonConfigStore.get().piSessionDiscovery?.scanEnabled) {
+    await syncPiSessionWorkspaces({
+      workspaceRegistry,
+      projectRegistry,
+      logger,
+    }).catch((error) => {
+      logger.warn({ err: error }, "pi_session_sync.initial_failed");
+    });
+    const intervalMs = daemonConfigStore.get().piSessionDiscovery?.scanIntervalMs ?? 60_000;
+    const syncTimer = setInterval(() => {
+      void syncPiSessionWorkspaces({
+        workspaceRegistry,
+        projectRegistry,
+        logger,
+      }).catch((error) => {
+        logger.warn({ err: error }, "pi_session_sync.interval_failed");
+      });
+    }, intervalMs);
+    syncTimer.unref?.();
+  }
   const teardownArchivedWorkspaceRuntime = (workspaceId: string): void => {
     scriptRuntimeStore.removeForWorkspace(workspaceId);
     releaseWorkspaceServicePortPlan(workspaceId);
