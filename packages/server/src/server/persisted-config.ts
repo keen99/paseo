@@ -280,6 +280,12 @@ export const PersistedConfigSchema = z
           .strict()
           .optional(),
         auth: DaemonAuthSchema.optional(),
+        piSessionDiscovery: z
+          .object({
+            scanEnabled: z.boolean().optional(),
+            scanIntervalMs: z.number().int().positive().max(3_600_000).optional(),
+          })
+          .optional(),
       })
       .strict()
       .transform(({ allowedHosts, ...daemon }) => {

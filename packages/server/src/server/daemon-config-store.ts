@@ -314,6 +314,7 @@ function mergeMutableConfigIntoPersistedConfig(params: {
       ...(mutable.terminalProfiles !== undefined
         ? { terminalProfiles: mutable.terminalProfiles }
         : {}),
+      ...(mutable.piSessionDiscovery ? { piSessionDiscovery: mutable.piSessionDiscovery } : {}),
     },
     agents: nextAgents,
   } as PersistedConfig;
